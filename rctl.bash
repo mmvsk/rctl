@@ -5,7 +5,6 @@
 
 if [[ -z $XDG_CONFIG_HOME ]]; then
 	# for mac os
-	echo fuck
 	XDG_CONFIG_HOME="$HOME/.config"
 fi
 
