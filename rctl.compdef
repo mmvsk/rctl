@@ -1,0 +1,23 @@
+#compdef rctl
+
+_rctl_add_command() {
+	local lines words
+	lines=(${(f)"$(rctl --- $@)"} )
+	words=(${(f)"$(rctl --- $@)"})
+	compadd -l -d lines -a -- words
+}
+
+_rctl() {
+	_arguments '1: :->a1' '2: :->a2' '3: :->a3' '4: :->a4' '5: :->a5' '6: :->a6'
+
+	case $state in
+		a1) _rctl_add_command ;;
+		a2) _rctl_add_command $words[2] ;;
+		a3) _rctl_add_command $words[2] $words[3] ;;
+		a4) _rctl_add_command $words[2] $words[3] $words[4] ;;
+		a5) _rctl_add_command $words[2] $words[3] $words[4] $words[5] ;;
+		a6) _rctl_add_command $words[2] $words[3] $words[4] $words[5] $words[6] ;;
+	esac
+}
+
+compdef _rctl rctl
