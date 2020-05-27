@@ -8,6 +8,10 @@ if [[ -z $XDG_CONFIG_HOME ]]; then
 	XDG_CONFIG_HOME="$HOME/.config"
 fi
 
+if [[ -z $EDITOR ]]; then
+	EDITOR="vi"
+fi
+
 g_rctl="$(basename "$0")"
 g_main_rctl="$XDG_CONFIG_HOME/rctl"
 g_main_config="$g_main_rctl/rctl.env" # global config
