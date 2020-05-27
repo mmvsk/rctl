@@ -46,7 +46,7 @@ throw() {
 
 info() {
 	local mesg="$1"
-	echo -e "\e[94m* ${mesg}\e[0m"
+	#echo -e "\e[94m* ${mesg}\e[0m"
 }
 
 detect_root() {
@@ -123,7 +123,7 @@ run_global_hook_if_exists() {
 	hook="$g_main_hooks_dir/${when}_${command}.bash"
 
 	if [[ -f $hook ]]; then
-		#info "running global hook: $when $command"
+		info "running global hook: $when $command"
 		source "$hook"
 	fi
 }
@@ -146,7 +146,7 @@ run_project_hook_if_exists() {
 		hook="$project/$g_project_hooks_dir/${when}_${command}.bash"
 
 		if [[ -f $hook ]]; then
-			#info "running project hook: $when $command"
+			info "running project hook: $when $command"
 			source "$hook"
 		fi
 	fi
@@ -503,7 +503,7 @@ project_push() {
 			rsync_exclude=("${rsync_exclude[@]}" --exclude="$f")
 		done
 
-		#info "running push to $target"
+		info "running push to $target"
 		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${remote_user}@${remote_host}:${remote_dir}"
 
 		run_project_hook_if_exists after push
@@ -543,7 +543,7 @@ project_ssh() {
 		run_project_hook_if_exists before ssh
 
 		if [[ "${#args[@]}" -gt 0 ]]; then
-			#info "running ssh on $target"
+			info "running ssh on $target"
 		fi
 		ssh "${remote_user}@${remote_host}" "${ssh_opts[@]}" "${args[@]}"
 
@@ -572,7 +572,7 @@ project_run() {
 		run_global_hook_if_exists before "$command"
 
 		source "$command_file"
-		#info "running global command: $command"
+		info "running global command: $command"
 		command_run
 
 		run_global_hook_if_exists after "$command"
@@ -605,9 +605,9 @@ project_run() {
 		source "$command_file"
 
 		if $is_project_command; then
-			#info "running project command: $command"
+			info "running project command: $command"
 		else
-			#info "running global command: $command"
+			info "running global command: $command"
 		fi
 
 		command_run "$@"
