@@ -307,8 +307,8 @@ project_init() {
 
 	[[ -d $project_rctl ]] || mkdir -p "$project_rctl"
 
-	if [[ ! -f $project_gitignore ]] || ! grep -E "$project_rctl_gitignore_grep" "$project_gitignore" >/dev/null; then
-		echo "$project_rctl_gitignore" >> "$project_gitignore"
+	if [[ ! -f $project_gitignore ]] || ! grep -E "$g_project_rctl_gitignore_grep" "$project_gitignore" >/dev/null; then
+		echo "$g_project_rctl_gitignore" >> "$project_gitignore"
 	fi
 
 	[[ -d $project_commands_dir ]] || mkdir "$project_commands_dir"
