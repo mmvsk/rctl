@@ -258,12 +258,12 @@ rctl_setup() {
 			echo "editor=\"$EDITOR\""
 			echo
 			echo "# note: keep the quotes"
-			echo "default_sync_include=\"(*)\""
-			echo "default_sync_exclude=\"()\""
+			echo "default_sync_include='(*)'"
+			echo "default_sync_exclude='()'"
 			echo "default_target=\"live\""
-			echo "default_remote_host=\"\""
-			echo "default_remote_user=\"\""
-			echo "default_remote_dir=\"\""
+			echo "default_remote_host='\"\"'"
+			echo "default_remote_user='\"\"'"
+			echo "default_remote_dir='\"\"'"
 		) >> "$g_main_config"
 	fi
 
