@@ -44,6 +44,11 @@ throw() {
 	exit $ERR
 }
 
+info() {
+	local mesg="$1"
+	echo -e "\e[94m* ${mesg}\e[0m"
+}
+
 detect_root() {
 	local hints=("$@")
 	local path="$PWD"
@@ -118,6 +123,7 @@ run_global_hook_if_exists() {
 	hook="$g_main_hooks_dir/${when}_${command}.bash"
 
 	if [[ -f $hook ]]; then
+		#info "running global hook: $when $command"
 		source "$hook"
 	fi
 }
@@ -140,6 +146,7 @@ run_project_hook_if_exists() {
 		hook="$project/$g_project_hooks_dir/${when}_${command}.bash"
 
 		if [[ -f $hook ]]; then
+			#info "running project hook: $when $command"
 			source "$hook"
 		fi
 	fi
@@ -429,7 +436,7 @@ project_edit_hook() {
 			echo "#"
 			echo "# you can call all rctl functions (see rctl.bash source), such as:"
 			echo "#     * \`project_ssh <target> [<command> [<args...>]]\`"
-			echo "#     * \`run_command <custom_command>\`"
+			echo "#     * \`project_run <custom_command>\`"
 			echo "#"
 			echo "# you can access and modify all variables, such as:"
 			echo "#     * \`project=\"\$project\"\` # current project root path"
@@ -496,6 +503,7 @@ project_push() {
 			rsync_exclude=("${rsync_exclude[@]}" --exclude="$f")
 		done
 
+		#info "running push to $target"
 		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${remote_user}@${remote_host}:${remote_dir}"
 
 		run_project_hook_if_exists after push
@@ -534,6 +542,9 @@ project_ssh() {
 		run_global_hook_if_exists before ssh
 		run_project_hook_if_exists before ssh
 
+		if [[ "${#args[@]}" -gt 0 ]]; then
+			#info "running ssh on $target"
+		fi
 		ssh "${remote_user}@${remote_host}" "${ssh_opts[@]}" "${args[@]}"
 
 		run_project_hook_if_exists after ssh
@@ -541,10 +552,11 @@ project_ssh() {
 	)
 }
 
-run_command() {
+project_run() {
 	local command="$1"; shift
 	local project=""
 	local command_file
+	local is_project_command
 
 	if [[ ! $command =~ ^[a-z_][a-z0-9_-]*$ ]]; then
 		throw "invalid command name"
@@ -560,6 +572,7 @@ run_command() {
 		run_global_hook_if_exists before "$command"
 
 		source "$command_file"
+		#info "running global command: $command"
 		command_run
 
 		run_global_hook_if_exists after "$command"
@@ -570,9 +583,11 @@ run_command() {
 	project="$(find_project_root)"
 
 	command_file="$project/$g_project_commands_dir/${command}.bash"
+	is_project_command=true
 
 	if [[ ! -f $command_file ]]; then
 		command_file="$g_main_commands_dir/${command}.bash"
+		is_project_command=false
 
 		if [[ ! -f $command_file ]]; then
 			throw "invalid command"
@@ -588,6 +603,13 @@ run_command() {
 		run_project_hook_if_exists before "$command"
 
 		source "$command_file"
+
+		if $is_project_command; then
+			#info "running project command: $command"
+		else
+			#info "running global command: $command"
+		fi
+
 		command_run "$@"
 
 		run_project_hook_if_exists after "$command"
@@ -745,7 +767,7 @@ main() {
 			;;
 
 		*)
-			run_command "$action" "$@"
+			project_run "$action" "$@"
 			;;
 	esac
 
