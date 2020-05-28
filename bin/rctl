@@ -701,7 +701,7 @@ autocomplete() {
 
 		*)
 			if [[ -n $project_commands ]]; then
-				for command in "$project_commands"; do
+				for command in $project_commands; do
 					if [[ $arg == $command ]]; then
 						command_file="$project/$g_project_commands_dir/${command}.bash"
 						source "$command_file"
