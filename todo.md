@@ -1,0 +1,3 @@
+- project.env -> to repository
+- remotes.env -> local only
+- hooks: also split local/general (be able to copy from project-local to project-general)

@@ -183,7 +183,7 @@ project_has_target() {
 	local target="$1"
 	local project_target
 
-	for project_target in "$(project_list_targets)"; do
+	for project_target in $(project_list_targets); do
 		if [[ $project_target == $target ]]; then
 			return $OK
 		fi
@@ -479,7 +479,7 @@ project_push() {
 	fi
 
 	if ! project_has_target "$target"; then
-		throw "target remote not defined (see \`$g_rctl config\`)"
+		throw "target '$target' is not defined (see \`$g_rctl config\`)"
 	fi
 
 	(
