@@ -371,7 +371,7 @@ project_edit_command() {
 		throw "requires the command name"
 	fi
 
-	if [[ ! $command =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
@@ -421,7 +421,7 @@ project_edit_hook() {
 		throw "requires the command name"
 	fi
 
-	if [[ ! $command =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
@@ -562,7 +562,7 @@ project_run() {
 	local command_file
 	local is_project_command
 
-	if [[ ! $command =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
