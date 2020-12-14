@@ -42,6 +42,11 @@ ERR=1
 err_not_project="not in an project (use \`$g_rctl init\` to initialize)"
 err_not_initializable="not in an initializable project (requires ${g_initializable_root_hints[@]})"
 
+# no operation
+_() {
+	echo -n
+}
+
 throw() {
 	local mesg="$1"
 	echo "error: $mesg" >&2
@@ -578,10 +583,11 @@ project_run() {
 		source "$command_file"
 		info "running global command: $command"
 		command_run
+		command_exit=$?
 
 		run_global_hook_if_exists after "$command"
 
-		exit $OK
+		exit $command_exit
 	fi
 
 	project="$(find_project_root)"
@@ -615,9 +621,12 @@ project_run() {
 		fi
 
 		command_run "$@"
+		command_exit=$?
 
 		run_project_hook_if_exists after "$command"
 		run_global_hook_if_exists after "$command"
+
+		exit $command_exit
 	)
 }
 
@@ -772,6 +781,7 @@ main() {
 
 		*)
 			project_run "$action" "$@"
+			exit $?
 			;;
 	esac
 
