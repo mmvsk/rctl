@@ -785,6 +785,7 @@ autocomplete() {
 				for command in $project_commands; do
 					if [[ $arg == $command ]]; then
 						command_file="$project/$g_project_commands_dir/${command}.bash"
+						source "$project/$g_project_config"
 						source "$command_file"
 						command_autocomplete "$@"
 					fi
