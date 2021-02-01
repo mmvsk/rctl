@@ -359,7 +359,7 @@ project_init() {
 				echo "#     you can version-control this file."
 				echo
 				echo
-				echo ". parameters.env"
+				echo "source .rctl/parameters.env"
 				echo
 				echo "sync_include=$default_sync_include"
 				echo "sync_exclude=$default_sync_exclude"
@@ -448,12 +448,15 @@ project_edit_command() {
 			echo "# you can call all internal functions"
 			echo
 			echo "command_run() {"
+			echo "	_"
 			echo "}"
 			echo
 			echo "command_usage() {"
+			echo "	_"
 			echo "}"
 			echo
 			echo "command_autocomplete() {"
+			echo "	_"
 			echo "}"
 		) >> $command_file
 	fi
