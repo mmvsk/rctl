@@ -20,11 +20,12 @@ g_main_hooks_dir="$g_main_rctl/hooks" # global hooks
 
 g_project_rctl=".local/rctl"
 g_project_rctl=".rctl"
-g_project_rctl_gitignore="/.local/"
-g_project_rctl_gitignore="/.rctl/"
+g_project_rctl_gitignore="/.local/*"
+g_project_rctl_gitignore="/.rctl/*"
 g_project_rctl_gitignore_grep="^/\.local(\$|/)"
 g_project_rctl_gitignore_grep="^/\.rctl(\$|/)"
-g_project_config="$g_project_rctl/project.env"
+g_project_config="$g_project_rctl/config.env"
+g_project_parameters="$g_project_rctl/parameters.env"
 g_project_commands_dir="$g_project_rctl/commands"
 g_project_hooks_dir="$g_project_rctl/hooks"
 g_project_root_hints=($g_project_config)
@@ -226,12 +227,14 @@ usage() {
 		echo "        deploy current project to the target remote"
 		echo "    .config"
 		echo "        edit project configuration"
+		echo "    .param"
+		echo "        edit project parameters"
 		echo "    .edit-command <command>"
 		echo "        edit a custom project command"
 		echo "    .edit-hook {before|after} <command>"
 		echo "        edit (or create) a hook {pre|post}-<command>"
 	fi
-	echo "    help [<custom_command>]"
+	echo "    .help [<custom_command>]"
 	echo "        print this help (or help about the specified custom command)"
 
 	if [[ -n $project_commands ]]; then
@@ -311,6 +314,7 @@ project_init() {
 	local project_gitignore="$project/.gitignore"
 
 	local project_config="$project/$g_project_config"
+	local project_parameters="$project/$g_project_parameters"
 	local project_commands_dir="$project/$g_project_commands_dir"
 	local project_hooks_dir="$project/$g_project_hooks_dir"
 
@@ -332,30 +336,69 @@ project_init() {
 			(
 				echo "# rctl project configuration"
 				echo "#"
-				echo "# sync_dir: base directory to deploy (% is the project root)"
-				echo "# sync_include: files to include (space-separated)"
-				echo "# sync_exclude: files to exclude (space-separated)"
-				echo "# targets: list of remote targets"
-				echo "# remote_<target>: remote connection config (\"<host>\" \"<user>\" \"<remote_dir>\")"
 				echo "#"
-				echo "# notes about files to include:"
-				echo "#     - \`(dist)\` will send the \`dist\` directory along with its contents"
-				echo "#     - \`(dist/*)\` will send the contents of the \`dist\` directory (without the directory itself)"
+				echo "# USAGE INFORMATION"
+				echo "#     sync_dir: base directory to deploy (% is the project root)"
+				echo "#     sync_include: files to include (space-separated)"
+				echo "#     sync_exclude: files to exclude (space-separated)"
+				echo ""
+				echo "#     notes about files to include:"
+				echo "#         - \`(dist)\` will send the \`dist\` directory along with its c"
+				echo "#         - \`(dist/*)\` will send the contents of \`dist\`, without the directory i"
 				echo "#"
-				echo "# notes about files to exclude:"
-				echo "#     - you target remote files/directories for exclusion, not local (see inclusion rules)"
-				echo "#     - for example, \`(dist/*.cache)\` will only work if you included the dist directory itself"
+				echo "#     notes about files to exclude:"
+				echo "#         - you target remote files/directories for exclusion, not local (see inclusion rules)"
+				echo "#         - for example, \`(dist/*.cache)\` will only work if you included the dist directory itself"
+				echo "#"
+				echo "#"
+				echo "# ABOUT OTHER CONFIG V"
+				echo "#     you can add here other parameters, that will be available in your hooks and commands."
+				echo "#"
+				echo "#"
+				echo "# ABOUT VERSION C"
+				echo "#     you can version-control this file."
+				echo
+				echo
+				echo ". parameters.env"
 				echo
 				echo "sync_include=$default_sync_include"
 				echo "sync_exclude=$default_sync_exclude"
-				echo
-				echo "targets=($default_target)"
-				echo "remote_$default_target=($default_remote_host $default_remote_user $default_remote_dir)"
 			) >> "$project_config"
 		)
 	fi
 
-	project_edit_config
+	if [[ ! -f $project_parameters ]]; then
+		touch "$project_parameters"
+
+		(
+			source "$g_main_config"
+
+			(
+				echo "# rctl project local p"
+				echo "#"
+				echo "#"
+				echo "# USAGE I"
+				echo "#     targets: list of remote t"
+				echo "#     remote_<target>: remote connection config (\"<host>\" \"<user>\" \"<remote_dir>"
+				echo "#"
+				echo "#"
+				echo "# ABOUT OTHER CONFIG V"
+				echo "#     you can add here other parameters, that will be available in your hooks and commands."
+				echo "#"
+				echo "#"
+				echo "# ABOUT VERSION C"
+				echo "#     do not version-control this file."
+				echo
+				echo
+				echo "targets=($default_target)"
+				echo "remote_$default_target=($default_remote_host $default_remote_user $default_remote_dir)"
+			) >> "$project_parameters"
+		)
+	fi
+
+	echo "rctl was initialized for this project"
+	echo "    use \`rctl .config\` to edit this project configuration"
+	echo "    use \`rctl .param\` to edit this project parameters"
 }
 
 project_edit_config() {
@@ -364,6 +407,14 @@ project_edit_config() {
 	fi
 
 	edit "$(find_project_root)/$g_project_config"
+}
+
+project_edit_parameters() {
+	if ! in_project; then
+		throw "$err_not_project"
+	fi
+
+	edit "$(find_project_root)/$g_project_parameters"
 }
 
 project_edit_command() {
@@ -673,6 +724,7 @@ autocomplete() {
 				echo ssh
 				echo push
 				echo .config
+				echo .param
 				echo .edit-hook
 				echo .edit-command
 				echo .help
@@ -774,6 +826,10 @@ main() {
 
 		.config)
 			project_edit_config
+			;;
+
+		.param)
+			project_edit_parameters
 			;;
 
 		.edit-command)
