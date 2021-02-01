@@ -114,7 +114,11 @@ in_initializable_project() {
 list_commands() {
 	local basedir="$1"
 
-	ls -1 $basedir | sed 's/\.bash//'
+	ls -1 "$basedir" | sed 's/\.bash//' | while read cmd; do
+		if [[ ! $cmd =~ ^[_.] ]]; then
+			echo "$cmd"
+		fi
+	done
 }
 
 run_global_hook_if_exists() {
@@ -129,7 +133,7 @@ run_global_hook_if_exists() {
 		throw "[fatal] command parameter is required"
 	fi
 
-	hook="$g_main_hooks_dir/${when}_${command}.bash"
+	hook="$g_main_hooks_dir/${command}.${when}.bash"
 
 	if [[ -f $hook ]]; then
 		info "running global hook: $when $command"
@@ -152,7 +156,7 @@ run_project_hook_if_exists() {
 	local project="$(find_project_root)"
 
 	if [[ -n $project ]]; then
-		hook="$project/$g_project_hooks_dir/${when}_${command}.bash"
+		hook="$project/$g_project_hooks_dir/${command}.${when}.bash"
 
 		if [[ -f $hook ]]; then
 			info "running project hook: $when $command"
@@ -220,11 +224,11 @@ usage() {
 		echo "        ssh to target remote"
 		echo "    push <target>"
 		echo "        deploy current project to the target remote"
-		echo "    config"
+		echo "    .config"
 		echo "        edit project configuration"
-		echo "    edit-command <command>"
+		echo "    .edit-command <command>"
 		echo "        edit a custom project command"
-		echo "    edit-hook {before|after} <command>"
+		echo "    .edit-hook {before|after} <command>"
 		echo "        edit (or create) a hook {pre|post}-<command>"
 	fi
 	echo "    help [<custom_command>]"
@@ -407,8 +411,12 @@ project_edit_command() {
 }
 
 project_edit_hook() {
-	local when="$1"
-	local command="$2"
+	#local when="$1"
+	#local command="$2"
+	local hook="$1"
+	local command="$(echo "$hook" | awk -F : '{ print $1 }')"
+	local when="$(echo "$hook" | awk -F : '{ print $2 }')"
+
 
 	local project="$(find_project_root)"
 	local hook_file
@@ -435,7 +443,7 @@ project_edit_hook() {
 		throw "not a valid command"
 	fi
 
-	hook_file="$project/$g_project_hooks_dir/${when}_${command}.bash"
+	hook_file="$project/$g_project_hooks_dir/${command}.${when}.bash"
 
 	if [[ ! -f $hook_file ]]; then
 		touch "$hook_file"
@@ -647,10 +655,12 @@ autocomplete() {
 
 	case $arg in
 		"")
-			echo help
+			if ! in_project; then
+				echo help
+			fi
 
 			if [[ -n $main_commands ]]; then
-				for cmd in "$main_commands"; do
+				for cmd in $main_commands; do
 					echo "$cmd"
 				done
 			fi
@@ -662,12 +672,13 @@ autocomplete() {
 			if in_project; then
 				echo ssh
 				echo push
-				echo config
-				echo edit-command
-				echo edit-hook
+				echo .config
+				echo .edit-hook
+				echo .edit-command
+				echo .help
 
 				if [[ -n $project_commands ]]; then
-					for cmd in "$project_commands"; do
+					for cmd in $project_commands; do
 						echo "$cmd"
 					done
 				fi
@@ -682,30 +693,36 @@ autocomplete() {
 			project_list_targets
 			;;
 
-		edit-command)
+		.edit-command)
 			if [[ -n $project_commands ]]; then
-				for cmd in "$project_commands"; do
+				for cmd in $project_commands; do
 					echo "$cmd"
 				done
 			fi
 			;;
 
-		edit-hook)
-			when="$1"; shift
+		.edit-hook)
+			if [[ -z $1 ]]; then
+				for cmd in push ssh ${project_commands[@]}; do
+					echo "$cmd:before"
+					echo "$cmd:after"
+				done
+			fi
+			#when="$1"; shift
 
-			case $when in
-				"")
-					echo before
-					echo after
-					;;
-				before|after)
-					echo push
-					echo ssh
-					for cmd in "$project_commands"; do
-						echo "$cmd"
-					done
-					;;
-			esac
+			#case $when in
+				#"")
+					#echo before
+					#echo after
+					#;;
+				#before|after)
+					#echo push
+					#echo ssh
+					#for cmd in "$project_commands"; do
+						#echo "$cmd"
+					#done
+					#;;
+			#esac
 			;;
 
 		*)
@@ -731,6 +748,11 @@ main() {
 
 	local action="$1"; shift
 
+	if ! in_project && [[ $action == "help" ]]; then
+		help
+		exit $OK
+	fi
+
 	case "$action" in
 		init)
 			project_init
@@ -750,24 +772,25 @@ main() {
 			project_ssh "$target" "${args[@]}"
 			;;
 
-		config)
+		.config)
 			project_edit_config
 			;;
 
-		edit-command)
+		.edit-command)
 			local command="$1"
 
 			project_edit_command "$command"
 			;;
 
-		edit-hook)
-			local when="$1"
-			local command="$2"
-
-			project_edit_hook "$when" "$command"
+		.edit-hook)
+			#local when="$1"
+			#local command="$2"
+			#project_edit_hook "$when" "$command"
+			local hook="$1"
+			project_edit_hook "$hook"
 			;;
 
-		help)
+		.help)
 			help
 			;;
 
