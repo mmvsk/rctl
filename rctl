@@ -204,6 +204,7 @@ project_has_target() {
 }
 
 usage() {
+	local command="$1"
 	local project="$(find_project_root)"
 	local project_commands=""
 	local main_commands="$(list_commands "$g_main_commands_dir")"
@@ -212,11 +213,41 @@ usage() {
 		project_commands="$(list_commands "$project/$g_project_commands_dir")"
 	fi
 
+	if [[ -n $command ]]; then
+		if in_project; then
+			for test_cmd in $project_commands; do
+				if [[ $test_cmd == $command ]]; then
+					project="$(find_project_root)"
+					project_rctl="$project/$g_project_rctl"
+					command_file="$project/$g_project_commands_dir/${command}.bash"
+					echo -n "rctl ${command} "
+					source "$(find_project_root)/$g_project_config"
+					source "$command_file"
+					command_usage "$@"
+					exit $?
+				fi
+			done
+		fi
+
+		for test_cmd in $main_commands; do
+			if [[ $test_cmd == $command ]]; then
+				command_file="$g_main_commands_dir/${command}.bash"
+				echo -n "rctl ${command} "
+				source "$command_file"
+				command_usage "$@"
+				exit $?
+			fi
+		done
+
+		throw "invalid command"
+	fi
+
 	echo "rctl: remote control for your projects"
 	echo
 	echo "usage: rctl <command> [<args...>]"
 	echo
-	echo "build-in commands:"
+	echo "built-in commands:"
+	echo
 	if ! in_project && in_initializable_project; then
 		echo "    init"
 		echo "        initialize rctl in a git project (in the current working directory)"
@@ -224,16 +255,22 @@ usage() {
 	if in_project; then
 		echo "    ssh <target>"
 		echo "        ssh to target"
+		echo
 		echo "    push <target>"
 		echo "        deploy current project to the target"
+		echo
 		echo "    .config"
 		echo "        edit project configuration"
+		echo
 		echo "    .param"
 		echo "        edit project parameters"
+		echo
 		echo "    .edit-command <command>"
 		echo "        edit a custom project command"
+		echo
 		echo "    .edit-hook {before|after} <command>"
 		echo "        edit (or create) a hook {pre|post}-<command>"
+		echo
 	fi
 	echo "    .help [<custom_command>]"
 	echo "        print this help (or help about the specified custom command)"
@@ -241,22 +278,30 @@ usage() {
 	if [[ -n $project_commands ]]; then
 		echo
 		echo "project-specific commands:"
-		for cmd in "$project_commands"; do
-			echo "    $cmd [<args...>]"
-			echo "        see \`$g_rctl help $cmd\` for details"
+		echo
+		for command in $project_commands; do
+			project="$(find_project_root)"
+			project_rctl="$project/$g_project_rctl"
+			command_file="$project/$g_project_commands_dir/${command}.bash"
+			source "$(find_project_root)/$g_project_config"
+			source "$command_file"
+			echo "    $command $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
+			echo
 		done
 	fi
 
 	if [[ -n $main_commands ]]; then
 		echo
 		echo "global custom commands:"
-		for cmd in "$main_commands"; do
-			echo "    $cmd [<args...>]"
-			echo "        see \`$g_rctl help $cmd\` for details"
+		echo
+		for command in $main_commands; do
+			command_file="$g_main_commands_dir/${command}.bash"
+			source "$command_file"
+			echo "    $command $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
+			echo
 		done
 	fi
 
-	echo
 	echo "edit your global config in: $g_main_rctl"
 }
 
@@ -288,15 +333,6 @@ rctl_setup() {
 
 # commands
 #-------------------------------------------------------------------------------
-
-help() {
-	local cmd="$1"
-
-	if [[ -z $cmd ]]; then
-		usage
-		return $OK
-	fi
-}
 
 project_init() {
 	local project
@@ -341,7 +377,7 @@ project_init() {
 				echo
 				echo "# Include local parameters (that shouldn't be version-controlled)"
 				echo "#"
-				echo "source \"$project/.rctl/parameters.env\""
+				echo "source \"$project_rctl/parameters.env\""
 				echo
 				echo
 				echo "# Files to include and exclude in the synchronization using 'push' (space-separated)."
@@ -439,19 +475,34 @@ project_edit_command() {
 		touch "$command_file"
 
 		(
-			echo "# you can call all internal functions"
+			echo '# project custom command'
+			echo '#     - you can call all internal functions (see `which rctl`)'
+			echo '#     - you can access all internal variables'
+			echo '#     - you can access your project config'
 			echo
-			echo "command_run() {"
-			echo "	_"
-			echo "}"
+			echo 'command_run() {'
+			echo '	_'
+			echo '}'
 			echo
-			echo "command_usage() {"
-			echo "	_"
-			echo "}"
+			echo 'command_usage() {'
+			echo '	# parameters'
+			echo '	#echo "{aaa|bbb}"'
+			echo '	# details (use $_ as 1-level padding)'
+			echo '	#echo "    aaa [--aaa1] -- aaa"'
+			echo '	#echo "    bbb          -- bbb"'
+			echo '}'
 			echo
-			echo "command_autocomplete() {"
-			echo "	_"
-			echo "}"
+			echo 'command_autocomplete() {'
+			echo '	#case "$1" in'
+			echo '		#"")'
+			echo '			#echo "aaa"'
+			echo '			#echo "bbb"'
+			echo '			#;;'
+			echo '		#aaa)'
+			echo '			#echo '--aaa1''
+			echo '			#;;'
+			echo '	#esac'
+			echo '}'
 		) >> $command_file
 	fi
 
@@ -462,8 +513,8 @@ project_edit_hook() {
 	#local when="$1"
 	#local command="$2"
 	local hook="$1"
-	local command="$(echo "$hook" | awk -F : '{ print $1 }')"
-	local when="$(echo "$hook" | awk -F : '{ print $2 }')"
+	local command="$(echo "$hook" | awk -F: '{ print $1 }')"
+	local when="$(echo "$hook" | awk -F: '{ print $2 }')"
 
 
 	local project="$(find_project_root)"
@@ -497,9 +548,9 @@ project_edit_hook() {
 		touch "$hook_file"
 
 		(
-			echo "# project hook: $when $command"
+			echo "# project hook: $command:$when"
 			echo "#"
-			echo "# you can call all rctl functions (see rctl.bash source), such as:"
+			echo "# you can call all rctl functions (see \`which rctl\` source code), such as:"
 			echo "#     * \`project_ssh <target> [<command> [<args...>]]\`"
 			echo "#     * \`project_run <custom_command>\`"
 			echo "#"
@@ -546,6 +597,7 @@ project_push() {
 	(
 		local args=("$@")
 		local project="$(find_project_root)"
+		local project_rctl="$project/$g_project_rctl"
 		cd "$project" # required for rsync
 
 		source "$(find_project_root)/$g_project_config"
@@ -595,6 +647,7 @@ project_ssh() {
 		local args=("$@")
 		local ssh_opts=()
 		local project="$(find_project_root)"
+		local project_rctl="$project/$g_project_rctl"
 		cd "$project" # required for rsync
 
 		source "$(find_project_root)/$g_project_config"
@@ -647,6 +700,7 @@ project_run() {
 	fi
 
 	project="$(find_project_root)"
+	project_rctl="$project/$g_project_rctl"
 
 	command_file="$project/$g_project_commands_dir/${command}.bash"
 	is_project_command=true
@@ -695,6 +749,7 @@ autocomplete() {
 
 	local main_commands="$(list_commands "$g_main_commands_dir")"
 	local project="$(find_project_root "$PWD")"
+	local project_rctl="$project/$g_project_rctl"
 	local project_commands=""
 
 	if in_project; then
@@ -704,7 +759,7 @@ autocomplete() {
 	case $arg in
 		"")
 			if ! in_project; then
-				echo help
+				echo .help
 			fi
 
 			if [[ -n $main_commands ]]; then
@@ -742,6 +797,15 @@ autocomplete() {
 			project_list_targets
 			;;
 
+		.help)
+			for cmd in $project_commands; do
+				echo "$cmd"
+			done
+			for cmd in $main_commands; do
+				echo "$cmd"
+			done
+			;;
+
 		.edit-command)
 			if [[ -n $project_commands ]]; then
 				for cmd in $project_commands; do
@@ -757,21 +821,6 @@ autocomplete() {
 					echo "$cmd:after"
 				done
 			fi
-			#when="$1"; shift
-
-			#case $when in
-				#"")
-					#echo before
-					#echo after
-					#;;
-				#before|after)
-					#echo push
-					#echo ssh
-					#for cmd in "$project_commands"; do
-						#echo "$cmd"
-					#done
-					#;;
-			#esac
 			;;
 
 		*)
@@ -798,8 +847,8 @@ main() {
 
 	local action="$1"; shift
 
-	if ! in_project && [[ $action == "help" ]]; then
-		help
+	if ! in_project && [[ $action == ".help" ]]; then
+		usage
 		exit $OK
 	fi
 
@@ -845,7 +894,7 @@ main() {
 			;;
 
 		.help)
-			help
+			usage "$@"
 			;;
 
 		---)
