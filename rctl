@@ -22,8 +22,8 @@ g_project_rctl=".rctl"
 g_project_rctl_gitignore_grep="^/\.rctl(\$|/)"
 g_project_rctl_gitignore=( \
 	"/.rctl/parameters.env" \
-	"/.rctl/commands/*.local.bash" \
-	"/.rctl/hooks/*.local.bash" \
+	"/.rctl/commands/local/*.bash" \
+	"/.rctl/hooks/local/*.bash" \
 )
 g_project_config="$g_project_rctl/config.env"
 g_project_parameters="$g_project_rctl/parameters.env"
@@ -365,6 +365,8 @@ project_init() {
 
 	[[ -d $project_commands_dir ]] || mkdir "$project_commands_dir"
 	[[ -d $project_hooks_dir ]] || mkdir "$project_hooks_dir"
+	[[ -d "$project_commands_dir/local" ]] || mkdir "$project_commands_dir/local"
+	[[ -d "$project_hooks_dir/local" ]] || mkdir "$project_hooks_dir/local"
 
 	if [[ ! -f $project_config ]]; then
 		touch "$project_config"
