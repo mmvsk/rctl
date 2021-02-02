@@ -18,12 +18,13 @@ g_main_config="$g_main_rctl/rctl.env" # global config
 g_main_commands_dir="$g_main_rctl/commands" # global custom commands
 g_main_hooks_dir="$g_main_rctl/hooks" # global hooks
 
-g_project_rctl=".local/rctl"
 g_project_rctl=".rctl"
-g_project_rctl_gitignore="/.local/*"
-g_project_rctl_gitignore="/.rctl/*"
-g_project_rctl_gitignore_grep="^/\.local(\$|/)"
 g_project_rctl_gitignore_grep="^/\.rctl(\$|/)"
+g_project_rctl_gitignore=( \
+	"/.rctl/parameters.env" \
+	"/.rctl/commands/*.local.bash" \
+	"/.rctl/hooks/*.local.bash" \
+)
 g_project_config="$g_project_rctl/config.env"
 g_project_parameters="$g_project_rctl/parameters.env"
 g_project_commands_dir="$g_project_rctl/commands"
@@ -222,9 +223,9 @@ usage() {
 	fi
 	if in_project; then
 		echo "    ssh <target>"
-		echo "        ssh to target remote"
+		echo "        ssh to target"
 		echo "    push <target>"
-		echo "        deploy current project to the target remote"
+		echo "        deploy current project to the target"
 		echo "    .config"
 		echo "        edit project configuration"
 		echo "    .param"
@@ -273,9 +274,9 @@ rctl_setup() {
 			echo "default_sync_include='(*)'"
 			echo "default_sync_exclude='()'"
 			echo "default_target=\"live\""
-			echo "default_remote_host='\"\"'"
-			echo "default_remote_user='\"\"'"
-			echo "default_remote_dir='\"\"'"
+			echo "default_target_host='\"\"'"
+			echo "default_target_user='\"\"'"
+			echo "default_target_dir='\"\"'"
 		) >> "$g_main_config"
 	fi
 
@@ -321,7 +322,9 @@ project_init() {
 	[[ -d $project_rctl ]] || mkdir -p "$project_rctl"
 
 	if [[ ! -f $project_gitignore ]] || ! grep -E "$g_project_rctl_gitignore_grep" "$project_gitignore" >/dev/null; then
-		echo "$g_project_rctl_gitignore" >> "$project_gitignore"
+		for line in "${g_project_rctl_gitignore[@]}"; do
+			echo "$line" >> "$project_gitignore"
+		done
 	fi
 
 	[[ -d $project_commands_dir ]] || mkdir "$project_commands_dir"
@@ -334,33 +337,23 @@ project_init() {
 			source "$g_main_config"
 
 			(
-				echo "# rctl project configuration"
+				echo "# rctl: project configuration"
+				echo
+				echo "# Include local parameters (that shouldn't be version-controlled)"
 				echo "#"
-				echo "#"
-				echo "# USAGE INFORMATION"
-				echo "#     sync_dir: base directory to deploy (% is the project root)"
-				echo "#     sync_include: files to include (space-separated)"
-				echo "#     sync_exclude: files to exclude (space-separated)"
-				echo ""
-				echo "#     notes about files to include:"
-				echo "#         - \`(dist)\` will send the \`dist\` directory along with its c"
-				echo "#         - \`(dist/*)\` will send the contents of \`dist\`, without the directory i"
-				echo "#"
-				echo "#     notes about files to exclude:"
-				echo "#         - you target remote files/directories for exclusion, not local (see inclusion rules)"
-				echo "#         - for example, \`(dist/*.cache)\` will only work if you included the dist directory itself"
-				echo "#"
-				echo "#"
-				echo "# ABOUT OTHER CONFIG V"
-				echo "#     you can add here other parameters, that will be available in your hooks and commands."
-				echo "#"
-				echo "#"
-				echo "# ABOUT VERSION C"
-				echo "#     you can version-control this file."
+				echo "source \"$project/.rctl/parameters.env\""
 				echo
 				echo
-				echo "source .rctl/parameters.env"
-				echo
+				echo "# Files to include and exclude in the synchronization using 'push' (space-separated)."
+				echo "#"
+				echo "# SYNTAX"
+				echo "#     - \`\"dist\"\` will send the 'dist' directory (with its content)"
+				echo "#     - \`\"dist/*\"\` will send only the content of 'dist' (not the directory itself)"
+				echo "#"
+				echo "# EXCLUDING"
+				echo "#     - you target REMOTE files/directories, not local"
+				echo "#     - e.g. \`\"dist/*.cache\"\` will only work if you included 'dist' itself"
+				echo "#"
 				echo "sync_include=$default_sync_include"
 				echo "sync_exclude=$default_sync_exclude"
 			) >> "$project_config"
@@ -374,25 +367,26 @@ project_init() {
 			source "$g_main_config"
 
 			(
-				echo "# rctl project local p"
-				echo "#"
-				echo "#"
+				echo "# rctl: project local parameters"
+				echo
+				echo
 				echo "# USAGE I"
-				echo "#     targets: list of remote t"
-				echo "#     remote_<target>: remote connection config (\"<host>\" \"<user>\" \"<remote_dir>"
-				echo "#"
+				echo "#     targets: list of targets"
+				echo "#     target_<target>: target connection config (\"<host>\" \"<user>\" \"<target_dir>"
 				echo "#"
 				echo "# ABOUT OTHER CONFIG V"
 				echo "#     you can add here other parameters, that will be available in your hooks and commands."
 				echo "#"
-				echo "#"
 				echo "# ABOUT VERSION C"
 				echo "#     do not version-control this file."
-				echo
-				echo
+				echo "#"
 				echo "targets=($default_target)"
-				echo "remote_$default_target=($default_remote_host $default_remote_user $default_remote_dir)"
+				echo "target_$default_target=($default_target_host $default_target_user $default_target_dir)"
 			) >> "$project_parameters"
+
+			if [[ ! -f "$project_parameters.dist" ]]; then
+				cp "$project_parameters" "$project_parameters.dist"
+			fi
 		)
 	fi
 
@@ -514,16 +508,16 @@ project_edit_hook() {
 			if [[ $command == "push" ]]; then
 				echo "#     * \`sync_include=(\"\${sync_include[@]}\")\` # files to include"
 				echo "#     * \`sync_exclude=(\"\${sync_exclude[@]}\")\` # files to exclude"
-				echo "#     * \`rsync_opts=\"\$rsync_opts\"\` # rsync options (for example, to remote -zz for older servers)"
+				echo "#     * \`rsync_opts=\"\$rsync_opts\"\` # rsync options (for example, to target -zz for older servers)"
 			fi
 			if [[ $command == "ssh" ]]; then
 				echo "#     * \`ssh_opts=(\"\${ssh_opts[@]}\")\` # options for ssh (default change dir, except if args not empty)"
 			fi
 			if [[ $command == "push" || $command == "ssh" ]]; then
-				echo "#     * \`target=\"\$target\"\` # remote target"
-				echo "#     * \`remote_host=\"\$remote_host\"\` # remote hostname"
-				echo "#     * \`remote_user=\"\$remote_user\"\` # remote username"
-				echo "#     * \`remote_dir=\"\$remote_dir\"\` # remote directory"
+				echo "#     * \`target=\"\$target\"\` # target"
+				echo "#     * \`target_host=\"\$target_host\"\` # target hostname"
+				echo "#     * \`target_user=\"\$target_user\"\` # target username"
+				echo "#     * \`target_dir=\"\$target_dir\"\` # target directory"
 				echo "#     * \`args=(\"\${args[@]}\")\` # provided command line arguments"
 			fi
 			echo
@@ -546,7 +540,7 @@ project_push() {
 	fi
 
 	if ! project_has_target "$target"; then
-		throw "target '$target' is not defined (see \`$g_rctl config\`)"
+		throw "target '$target' is not defined (see \`$g_rctl .param\`)"
 	fi
 
 	(
@@ -556,10 +550,10 @@ project_push() {
 
 		source "$(find_project_root)/$g_project_config"
 
-		local remote="remote_$target"
-		local remote_host="$(eval echo \"\${$remote[0]}\")"
-		local remote_user="$(eval echo \"\${$remote[1]}\")"
-		local remote_dir="$(eval echo \"\${$remote[2]}\")"
+		local target_full="target_$target"
+		local target_host="$(eval echo \"\${$target_full[0]}\")"
+		local target_user="$(eval echo \"\${$target_full[1]}\")"
+		local target_dir="$(eval echo \"\${$target_full[2]}\")"
 
 		local rsync=rsync
 		local rsync_opts="$g_rsync_opts"
@@ -575,7 +569,7 @@ project_push() {
 		done
 
 		info "running push to $target"
-		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${remote_user}@${remote_host}:${remote_dir}"
+		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${target_user}@${target_host}:${target_dir}"
 
 		run_project_hook_if_exists after push
 		run_global_hook_if_exists after push
@@ -594,7 +588,7 @@ project_ssh() {
 	fi
 
 	if ! project_has_target "$target"; then
-		throw "target remote not defined (see \`$g_rctl config\`)"
+		throw "target not defined (see \`$g_rctl .param\`)"
 	fi
 
 	(
@@ -605,10 +599,10 @@ project_ssh() {
 
 		source "$(find_project_root)/$g_project_config"
 
-		local remote="remote_$target"
-		local remote_host="$(eval echo \"\${$remote[0]}\")"
-		local remote_user="$(eval echo \"\${$remote[1]}\")"
-		local remote_dir="$(eval echo \"\${$remote[2]}\")"
+		local target_full="target_$target"
+		local target_host="$(eval echo \"\${$target_full[0]}\")"
+		local target_user="$(eval echo \"\${$target_full[1]}\")"
+		local target_dir="$(eval echo \"\${$target_full[2]}\")"
 
 		run_global_hook_if_exists before ssh
 		run_project_hook_if_exists before ssh
@@ -616,7 +610,7 @@ project_ssh() {
 		if [[ "${#args[@]}" -gt 0 ]]; then
 			info "running ssh on $target"
 		fi
-		ssh "${remote_user}@${remote_host}" "${ssh_opts[@]}" "${args[@]}"
+		ssh "${target_user}@${target_host}" "${ssh_opts[@]}" "${args[@]}"
 
 		run_project_hook_if_exists after ssh
 		run_global_hook_if_exists after ssh
