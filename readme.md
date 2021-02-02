@@ -19,4 +19,4 @@ Usage
 -----
 
 - See `rctl help`
-- See `vi ~/.rctl/rctl.bash`
+- See `vi $(which rctl)`
