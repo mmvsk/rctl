@@ -8,7 +8,7 @@ _rctl_add_command() {
 }
 
 _rctl() {
-	_arguments '1: :->a1' '2: :->a2' '3: :->a3' '4: :->a4' '5: :->a5' '6: :->a6'
+	_arguments '1: :->a1' '2: :->a2' '3: :->a3' '4: :->a4' '5: :->a5' '6: :->a6' '7: :->a7' '8: :->a8' '9: :->a9'
 
 	case $state in
 		a1) _rctl_add_command ;;
@@ -17,6 +17,9 @@ _rctl() {
 		a4) _rctl_add_command $words[2] $words[3] $words[4] ;;
 		a5) _rctl_add_command $words[2] $words[3] $words[4] $words[5] ;;
 		a6) _rctl_add_command $words[2] $words[3] $words[4] $words[5] $words[6] ;;
+		a7) _rctl_add_command $words[2] $words[3] $words[4] $words[5] $words[6] $words[7] ;;
+		a8) _rctl_add_command $words[2] $words[3] $words[4] $words[5] $words[6] $words[7] $words[8] ;;
+		a9) _rctl_add_command $words[2] $words[3] $words[4] $words[5] $words[6] $words[7] $words[8] $words[9] ;;
 	esac
 }
 
