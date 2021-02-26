@@ -182,6 +182,9 @@ project_list_targets() {
 	fi
 
 	(
+		local project="$(find_project_root)"
+		local project_rctl="$project/$g_project_rctl"
+		cd "$project" # required for rsync
 		source "$(find_project_root)/$g_project_config"
 
 		for target in "${targets[@]}"; do

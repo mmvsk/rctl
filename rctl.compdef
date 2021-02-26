@@ -8,6 +8,8 @@ _rctl_add_command() {
 }
 
 _rctl() {
+	zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
 	_arguments '1: :->a1' '2: :->a2' '3: :->a3' '4: :->a4' '5: :->a5' '6: :->a6' '7: :->a7' '8: :->a8' '9: :->a9'
 
 	case $state in
