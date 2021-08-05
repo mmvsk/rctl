@@ -51,13 +51,25 @@ _() {
 
 throw() {
 	local mesg="$1"
-	echo "error: $mesg" >&2
+
+	echo -e "error: $mesg" >&2
+
 	exit $ERR
 }
 
 info() {
 	local mesg="$1"
 	#echo -e "\e[94m* ${mesg}\e[0m"
+}
+
+in_array() {
+	local entry match="$1"
+	shift
+	# for without a list iterates over the argument list
+	for entry; do
+		[[ $entry == $match ]] && return $OK
+	done
+	return $ERR
 }
 
 detect_root() {
@@ -382,7 +394,7 @@ project_init() {
 				echo
 				echo "# Include local parameters (that shouldn't be version-controlled)"
 				echo "#"
-				echo "source \"$project_rctl/parameters.env\""
+				echo "source \"\$project_rctl/parameters.env\""
 				echo
 				echo
 				echo "# Files to include and exclude in the synchronization using 'push' (space-separated)."
