@@ -128,11 +128,13 @@ in_initializable_project() {
 list_commands() {
 	local basedir="$1"
 
-	ls -1 "$basedir" | sed 's/\.bash//' | while read cmd; do
-		if [[ ! $cmd =~ ^[_.] ]]; then
-			echo "$cmd"
-		fi
-	done
+	if [[ -d $basedir ]]; then
+		ls -1 "$basedir" | sed 's/\.bash//' | while read cmd; do
+			if [[ ! $cmd =~ ^[_.] ]]; then
+				echo "$cmd"
+			fi
+		done
+	fi
 }
 
 run_global_hook_if_exists() {
@@ -394,6 +396,7 @@ project_init() {
 				echo
 				echo "# Include local parameters (that shouldn't be version-controlled)"
 				echo "#"
+				echo "[[ -f \"\$project_rctl/parameters.env\" ]] || exit 1"
 				echo "source \"\$project_rctl/parameters.env\""
 				echo
 				echo
