@@ -539,6 +539,11 @@ project_edit_command() {
 			echo
 			echo '	edit "$command_file"'
 			echo '}'
+		) >> $command_file
+	fi
+
+	edit "$command_file"
+}
 
 project_edit_hook() {
 	#local when="$1"
