@@ -130,7 +130,7 @@ list_commands() {
 
 	if [[ -d $basedir ]]; then
 		ls -1 "$basedir" | sed 's/\.bash//' | while read cmd; do
-			if [[ ! $cmd =~ ^[_.] ]]; then
+			if [[ -f "$basedir/$cmd.bash" && ! $cmd =~ ^[_.] ]]; then
 				echo "$cmd"
 			fi
 		done
@@ -319,7 +319,7 @@ usage() {
 		done
 	fi
 
-	echo "edit your global config in: $g_main_rctl"
+	#echo "edit your global config in: $g_main_rctl"
 }
 
 rctl_setup() {
@@ -333,7 +333,7 @@ rctl_setup() {
 			echo "editor=\"$EDITOR\""
 			echo
 			echo "# note: keep the quotes"
-			echo "default_sync_include='(*)'"
+			echo "default_sync_include='(\"*\")'"
 			echo "default_sync_exclude='()'"
 			echo "default_target=\"live\""
 			echo "default_target_host='\"\"'"
@@ -501,7 +501,8 @@ project_edit_command() {
 			echo '#     - you can access your project config'
 			echo
 			echo 'command_run() {'
-			echo '	_'
+			echo '	_print "" # command parameters (summary)'
+			echo '	#_print "\t" # command info'
 			echo '}'
 			echo
 			echo 'command_usage() {'
@@ -519,15 +520,25 @@ project_edit_command() {
 			echo '			#echo "bbb"'
 			echo '			#;;'
 			echo '		#aaa)'
-			echo '			#echo '--aaa1''
-			echo '			#;;'
+			echo '			#echo "--aaa1"'
+			echo '			#'
 			echo '	#esac'
 			echo '}'
-		) >> $command_file
-	fi
-
-	edit "$command_file"
-}
+			echo
+			echo '_throw_usage() {'
+			echo '	command_usage >&2'
+			echo '	exit $ERR'
+			echo '}'
+			echo 
+			echo # print with leading indentation
+			echo '_print() {'
+			echo "	echo -e \"$1\"\ | perl -pe 's/\t/    /g'"
+			echo '}'
+			echo '		) >> $command_file'
+			echo '	fi'
+			echo
+			echo '	edit "$command_file"'
+			echo '}'
 
 project_edit_hook() {
 	#local when="$1"
