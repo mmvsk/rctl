@@ -646,8 +646,8 @@ project_push() {
 		local rsync=rsync
 		local rsync_opts="$g_rsync_opts"
 
-		run_global_hook_if_exists before push
-		run_project_hook_if_exists before push
+		run_global_hook_if_exists before push "$@"
+		run_project_hook_if_exists before push "$@"
 
 		if [[ -z $target_host || -z $target_user || -z $target_dir ]]; then
 			throw "no ssh parameters found for target '$target' in parameters.env"
@@ -663,8 +663,8 @@ project_push() {
 		info "running push to $target"
 		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${target_user}@${target_host}:${target_dir}"
 
-		run_project_hook_if_exists after push
-		run_global_hook_if_exists after push
+		run_project_hook_if_exists after push "$@"
+		run_global_hook_if_exists after push "$@"
 	)
 }
 
@@ -696,8 +696,8 @@ project_ssh() {
 		local target_host="$(eval echo \"\${$target_full[0]}\")"
 		local target_user="$(eval echo \"\${$target_full[1]}\")"
 
-		run_global_hook_if_exists before ssh
-		run_project_hook_if_exists before ssh
+		run_global_hook_if_exists before ssh "$@"
+		run_project_hook_if_exists before ssh "$@"
 
 		if [[ -z $target_host || -z $target_user ]]; then
 			throw "no ssh parameters found for target '$target' in parameters.env"
@@ -708,8 +708,8 @@ project_ssh() {
 		fi
 		ssh "${target_user}@${target_host}" "${ssh_opts[@]}" "${args[@]}"
 
-		run_project_hook_if_exists after ssh
-		run_global_hook_if_exists after ssh
+		run_project_hook_if_exists after ssh "$@"
+		run_global_hook_if_exists after ssh "$@"
 	)
 }
 
@@ -833,11 +833,19 @@ autocomplete() {
 			;;
 
 		push)
-			project_list_targets
+			case "$1" in
+				"")
+					project_list_targets
+					;;
+			esac
 			;;
 
 		ssh)
-			project_list_targets
+			case "$1" in
+				"")
+					project_list_targets
+					;;
+			esac
 			;;
 
 		.help)
