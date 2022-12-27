@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -o pipefail
 # set -e -> exit if any command has a non-zero exit status
 # set -u -> reference to any undefined variable is an error
 # set -x -> print all executed commands to the terminal
