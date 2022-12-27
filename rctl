@@ -64,6 +64,48 @@ throw() {
 	exit $ERR
 }
 
+
+task_head() {
+	local task_name="$1"
+	local progress_start="$2"
+
+	echo -ne "task \e[97;1m${task_name}\e[0m {\n\e[90m"
+
+	if [[ -n "$progress_start" ]]; then
+		echo "    $progress_start"
+	fi
+}
+
+task_end() {
+	local progress_end="$1"
+
+	if [[ -n "$progress_end" ]]; then
+		echo "$progress_end"
+	fi
+
+	echo -e "\e[0m}\n"
+}
+
+task() (
+	local task_name="$1"
+	local task_cmd=("${@:2}")
+
+	if [[ "${task_cmd[0]}" == "--cwd" ]]; then
+		if [[ -z "${task_cmd[1]}" || ! -d "${task_cmd[1]}" ]]; then
+			throw "invalid directory: ${${task_cmd[1]-"unknown"}}"
+		fi
+
+		cd "${task_cmd[1]}"
+		task_cmd=("${task_cmd[@]:2}")
+	fi
+
+	task_head "$task_name"
+
+	echo -ne "\e[90m"
+	"${task_cmd[@]}" 2>&1 | sed 's/^/    /' && echo -e "\e[0m}\n" \
+		|| { task_end; throw "task '${task_name}' failed"; }
+)
+
 info() {
 	local mesg="$1"
 	#echo -e "\e[94m* ${mesg}\e[0m"
