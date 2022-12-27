@@ -66,7 +66,7 @@ throw() {
 
 
 task_head() {
-	local task_name="$1"
+	local task_name="$(echo "$1" | perl -pe 's/ +/_/g')"
 	local progress_start="$2"
 
 	echo -ne "task \e[97;1m${task_name}\e[0m {\n\e[90m"
@@ -87,7 +87,7 @@ task_end() {
 }
 
 task() (
-	local task_name="$1"
+	local task_name="$(echo "$1" | perl -pe 's/ +/_/g')"
 	local task_cmd=("${@:2}")
 
 	if [[ "${task_cmd[0]}" == "--cwd" ]]; then
