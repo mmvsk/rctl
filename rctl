@@ -90,20 +90,24 @@ task() {
 	local task_name="$(echo "$1" | perl -pe 's/ +/_/g')"
 	local task_cmd=("${@:2}")
 
-	if [[ "${task_cmd[0]}" == "--cwd" ]]; then
-		if [[ -z "${task_cmd[1]}" || ! -d "${task_cmd[1]}" ]]; then
-			throw "invalid directory: ${${task_cmd[1]-"unknown"}}"
+	# execute in a separate unit so we don't mess with the cwd
+	(
+		if [[ "${task_cmd[0]}" == "--cwd" ]]; then
+			if [[ -z "${task_cmd[1]}" || ! -d "${task_cmd[1]}" ]]; then
+				throw "invalid directory: ${${task_cmd[1]-"unknown"}}"
+			fi
+
+			cd "${task_cmd[1]}"
+			task_cmd=("${task_cmd[@]:2}")
 		fi
 
-		cd "${task_cmd[1]}"
-		task_cmd=("${task_cmd[@]:2}")
-	fi
+		task_head "$task_name"
 
-	task_head "$task_name"
+		echo -ne "\e[90m"
+		"${task_cmd[@]}" 2>&1 | sed 's/^/    /' && echo -e "\e[0m}\n" \
+			|| { task_end; throw "task '${task_name}' failed"; }
 
-	echo -ne "\e[90m"
-	"${task_cmd[@]}" 2>&1 | sed 's/^/    /' && echo -e "\e[0m}\n" \
-		|| { task_end; throw "task '${task_name}' failed"; }
+	) || exit 1
 }
 
 info() {
