@@ -86,7 +86,7 @@ task_end() {
 	echo -e "\e[0m}\n"
 }
 
-task() (
+task() {
 	local task_name="$(echo "$1" | perl -pe 's/ +/_/g')"
 	local task_cmd=("${@:2}")
 
@@ -104,7 +104,7 @@ task() (
 	echo -ne "\e[90m"
 	"${task_cmd[@]}" 2>&1 | sed 's/^/    /' && echo -e "\e[0m}\n" \
 		|| { task_end; throw "task '${task_name}' failed"; }
-)
+}
 
 info() {
 	local mesg="$1"
