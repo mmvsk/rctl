@@ -229,7 +229,7 @@ run_project_hook_if_exists() {
 
 		if [[ -f $hook ]]; then
 			info "running project hook: $when $command"
-			source "$hook"
+			source "$hook" || exit $ERR
 		fi
 	fi
 }
@@ -699,8 +699,8 @@ project_push() {
 		local rsync=rsync
 		local rsync_opts="$g_rsync_opts"
 
-		run_global_hook_if_exists before push "$@"
-		run_project_hook_if_exists before push "$@"
+		run_global_hook_if_exists before push "$@" || return $ERR
+		run_project_hook_if_exists before push "$@" || return $ERR
 
 		if [[ -z $target_host || -z $target_user || -z $target_dir ]]; then
 			throw "no ssh parameters found for target '$target' in parameters.env"
@@ -716,8 +716,8 @@ project_push() {
 		info "running push to $target"
 		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${target_user}@${target_host}:${target_dir}"
 
-		run_project_hook_if_exists after push "$@"
-		run_global_hook_if_exists after push "$@"
+		run_project_hook_if_exists after push "$@" || return $ERR
+		run_global_hook_if_exists after push "$@" || return $ERR
 	)
 }
 
@@ -965,7 +965,7 @@ main() {
 			local target="$1"; shift
 			local args=("$@")
 
-			project_push "$target" "${args[@]}"
+			project_push "$target" "${args[@]}" || exit $ERR
 			;;
 
 		ssh)
