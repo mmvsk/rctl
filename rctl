@@ -7,6 +7,12 @@ set -o pipefail
 # set -o pipefail -> prevents errors in a pipeline from being masked
 
 
+# backup values
+#-------------------------------------------------------------------------------
+
+g_backup_pwd="$PWD"
+
+
 # config
 #-------------------------------------------------------------------------------
 
@@ -21,22 +27,27 @@ fi
 
 g_rctl="$(basename "$0")"
 g_main_rctl="$XDG_CONFIG_HOME/rctl"
-g_main_config="$g_main_rctl/rctl.env" # global config
-g_main_commands_dir="$g_main_rctl/commands" # global custom commands
+g_main_cmd_dir="$g_main_rctl/cmd" # global commands
 g_main_hooks_dir="$g_main_rctl/hooks" # global hooks
+g_main_config="$g_main_rctl/rctl.env" # global config
 
 g_project_rctl=".rctl"
 g_project_rctl_gitignore_grep="^/\.rctl(\$|/)"
 g_project_rctl_gitignore=( \
-	"/.rctl/parameters.env" \
-	"/.rctl/commands/local/*.bash" \
+	"/.rctl/cmd/local/*.bash" \
 	"/.rctl/hooks/local/*.bash" \
+	"/.rctl/param.env" \
 )
-g_project_config="$g_project_rctl/config.env"
-g_project_parameters="$g_project_rctl/parameters.env"
-g_project_commands_dir="$g_project_rctl/commands"
+g_project_cmd_dir="$g_project_rctl/cmd"
 g_project_hooks_dir="$g_project_rctl/hooks"
-g_project_root_hints=($g_project_config)
+g_project_param="$g_project_rctl/param.env"
+g_project_setup="$g_project_rctl/setup.env"
+
+g_project_cmd_dir_OLD="$g_project_rctl/commands"
+g_project_param_OLD="$g_project_rctl/parameters.env"
+g_project_setup_OLD="$g_project_rctl/config.env"
+
+g_project_root_hints=("$g_project_setup" "$g_project_setup_OLD")
 g_initializable_root_hints=(".git")
 
 g_rsync_opts="--recursive --executability --copy-links --delete -zz"
@@ -191,44 +202,44 @@ list_commands() {
 }
 
 run_global_hook_if_exists() {
-	local when="$1"
-	local command="$2"
+	local cmd="$1"
+	local at="$2"
 
-	if [[ $when != "before" && $when != "after" ]]; then
+	if [[ $at != "before" && $at != "after" ]]; then
 		throw "[fatal] hook moments must be before or after"
 	fi
 
-	if [[ -z $command ]]; then
+	if [[ -z $cmd ]]; then
 		throw "[fatal] command parameter is required"
 	fi
 
-	hook="$g_main_hooks_dir/${command}.${when}.bash"
+	hook="$g_main_hooks_dir/${cmd}.${at}.bash"
 
 	if [[ -f $hook ]]; then
-		info "running global hook: $when $command"
+		info "running global hook: $at $cmd"
 		source "$hook"
 	fi
 }
 
 run_project_hook_if_exists() {
-	local when="$1"
-	local command="$2"
+	local cmd="$1"
+	local at="$2"
 
-	if [[ $when != "before" && $when != "after" ]]; then
+	if [[ $at != "before" && $at != "after" ]]; then
 		throw "[fatal] hook moments must be before or after"
 	fi
 
-	if [[ -z $command ]]; then
+	if [[ -z $cmd ]]; then
 		throw "[fatal] command parameter is required"
 	fi
 
 	local project="$(find_project_root)"
 
 	if [[ -n $project ]]; then
-		hook="$project/$g_project_hooks_dir/${command}.${when}.bash"
+		hook="$project/$g_project_hooks_dir/${cmd}.${at}.bash"
 
 		if [[ -f $hook ]]; then
-			info "running project hook: $when $command"
+			info "running project hook: $at $cmd"
 			source "$hook" || exit $ERR
 		fi
 	fi
@@ -252,7 +263,7 @@ project_list_targets() {
 		local project="$(find_project_root)"
 		local project_rctl="$project/$g_project_rctl"
 		cd "$project" # required for rsync
-		source "$(find_project_root)/$g_project_config"
+		source "$(find_project_root)/$g_project_setup"
 
 		for target in "${targets[@]}"; do
 			echo "$target"
@@ -274,36 +285,36 @@ project_has_target() {
 }
 
 usage() {
-	local command="$1"
+	local cmd="$1"
+	local main_cmd="$(list_commands "$g_main_cmd_dir")"
 	local project="$(find_project_root)"
-	local project_commands=""
-	local main_commands="$(list_commands "$g_main_commands_dir")"
+	local project_cmd=""
 
 	if in_project; then
-		project_commands="$(list_commands "$project/$g_project_commands_dir")"
+		project_cmd="$(list_commands "$project/$g_project_cmd_dir")"
 	fi
 
-	if [[ -n $command ]]; then
+	if [[ -n $cmd ]]; then
 		if in_project; then
-			for test_cmd in $project_commands; do
-				if [[ $test_cmd == $command ]]; then
+			for test_cmd in $project_cmd; do
+				if [[ $test_cmd == $cmd ]]; then
 					project="$(find_project_root)"
 					project_rctl="$project/$g_project_rctl"
-					command_file="$project/$g_project_commands_dir/${command}.bash"
-					echo -n "rctl ${command} "
-					source "$(find_project_root)/$g_project_config"
-					source "$command_file"
+					cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+					echo -n "rctl ${cmd} "
+					source "$(find_project_root)/$g_project_setup"
+					source "$cmd_file"
 					command_usage "$@"
 					exit $?
 				fi
 			done
 		fi
 
-		for test_cmd in $main_commands; do
-			if [[ $test_cmd == $command ]]; then
-				command_file="$g_main_commands_dir/${command}.bash"
-				echo -n "rctl ${command} "
-				source "$command_file"
+		for test_cmd in $main_cmd; do
+			if [[ $test_cmd == $cmd ]]; then
+				cmd_file="$g_main_cmd_dir/${cmd}.bash"
+				echo -n "rctl ${cmd} "
+				source "$cmd_file"
 				command_usage "$@"
 				exit $?
 			fi
@@ -314,7 +325,7 @@ usage() {
 
 	echo "rctl: remote control for your projects"
 	echo
-	echo "usage: rctl <command> [<args...>]"
+	echo "usage: rctl <cmd> [<args...>]"
 	echo
 	echo "built-in commands:"
 	echo
@@ -329,57 +340,57 @@ usage() {
 		echo "    push <target>"
 		echo "        deploy current project to the target"
 		echo
-		echo "    .config"
-		echo "        edit project configuration"
+		echo "    .edit-cmd <cmd>"
+		echo "        edit a custom project command"
+		echo
+		echo "    .edit-hook {before|after} <cmd>"
+		echo "        edit (or create) a hook {pre|post}-<cmd>"
 		echo
 		echo "    .param"
 		echo "        edit project parameters"
 		echo
-		echo "    .edit-command <command>"
-		echo "        edit a custom project command"
-		echo
-		echo "    .edit-hook {before|after} <command>"
-		echo "        edit (or create) a hook {pre|post}-<command>"
+		echo "    .setup"
+		echo "        edit project setup"
 		echo
 	fi
-	echo "    .help [<custom_command>]"
+	echo "    .help [<custom_cmd>]"
 	echo "        print this help (or help about the specified custom command)"
 
-	if [[ -n $project_commands ]]; then
+	if [[ -n $project_cmd ]]; then
 		echo
 		echo "project-specific commands:"
 		echo
-		for command in $project_commands; do
+		for cmd in $project_cmd; do
 			project="$(find_project_root)"
 			project_rctl="$project/$g_project_rctl"
-			command_file="$project/$g_project_commands_dir/${command}.bash"
-			source "$(find_project_root)/$g_project_config"
-			source "$command_file"
-			echo "    $command $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
+			cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+			source "$(find_project_root)/$g_project_setup"
+			source "$cmd_file"
+			echo "    $cmd $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
 			echo
 		done
 	fi
 
-	if [[ -n $main_commands ]]; then
+	if [[ -n $main_cmd ]]; then
 		echo
 		echo "global custom commands:"
 		echo
-		for command in $main_commands; do
-			command_file="$g_main_commands_dir/${command}.bash"
-			source "$command_file"
-			echo "    $command $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
+		for cmd in $main_cmd; do
+			cmd_file="$g_main_cmd_dir/${cmd}.bash"
+			source "$cmd_file"
+			echo "    $cmd $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
 			echo
 		done
 	fi
 
-	#echo "edit your global config in: $g_main_rctl"
+	#echo "edit your global setup in: $g_main_rctl"
 }
 
 rctl_setup() {
 	if [[ ! -d $g_main_rctl ]]; then
 		mkdir -p "$g_main_rctl"
 		touch "$g_main_config"
-		mkdir "$g_main_commands_dir"
+		mkdir "$g_main_cmd_dir"
 		mkdir "$g_main_hooks_dir"
 
 		(
@@ -420,10 +431,22 @@ project_init() {
 	local project_rctl="$project/$g_project_rctl"
 	local project_gitignore="$project/.gitignore"
 
-	local project_config="$project/$g_project_config"
-	local project_parameters="$project/$g_project_parameters"
-	local project_commands_dir="$project/$g_project_commands_dir"
+	local project_cmd_dir="$project/$g_project_cmd_dir"
 	local project_hooks_dir="$project/$g_project_hooks_dir"
+	local project_param="$project/$g_project_param"
+	local project_setup="$project/$g_project_setup"
+
+	if [[ ! -d $project_cmd_dir && -d "$project/$g_project_cmd_dir_OLD" ]]; then
+		project_cmd_dir="$project/$g_project_cmd_dir_OLD"
+	fi
+
+	if [[ ! -f $project_param && -f "$project/$g_project_param_OLD" ]]; then
+		project_param="$project/$g_project_param_OLD"
+	fi
+
+	if [[ ! -f $project_setup && -f "$project/$g_project_setup_OLD" ]]; then
+		project_setup="$project/$g_project_setup_OLD"
+	fi
 
 	[[ -d $project_rctl ]] || mkdir -p "$project_rctl"
 
@@ -433,26 +456,29 @@ project_init() {
 		done
 	fi
 
-	[[ -d $project_commands_dir ]] || mkdir "$project_commands_dir"
+	[[ -d $project_cmd_dir ]] || mkdir "$project_cmd_dir"
 	[[ -d $project_hooks_dir ]] || mkdir "$project_hooks_dir"
-	[[ -d "$project_commands_dir/local" ]] || mkdir "$project_commands_dir/local"
+	[[ -d "$project_cmd_dir/local" ]] || mkdir "$project_cmd_dir/local"
 	[[ -d "$project_hooks_dir/local" ]] || mkdir "$project_hooks_dir/local"
 
-	if [[ ! -f $project_config ]]; then
-		touch "$project_config"
+	if [[ ! -f $project_setup ]]; then
+		touch "$project_setup"
 
 		(
 			source "$g_main_config"
 
 			(
-				echo "# rctl: project configuration"
-				echo
-				echo "# Include local parameters (that shouldn't be version-controlled)"
 				echo "#"
-				echo "[[ -f \"\$project_rctl/parameters.env\" ]] || exit 1"
-				echo "source \"\$project_rctl/parameters.env\""
+				echo "# rctl: project general setup"
+				echo "#"
+				echo "# include local param (that should NOT be version controlled)"
+				echo "#"
+				echo
+				echo "[[ -f \"\$project_rctl/param.env\" ]] || exit 1"
+				echo "source \"\$project_rctl/param.env\""
 				echo
 				echo
+				echo "#"
 				echo "# Files to include and exclude in the synchronization using 'push' (space-separated)."
 				echo "#"
 				echo "# SYNTAX"
@@ -463,66 +489,66 @@ project_init() {
 				echo "#     - you target REMOTE files/directories, not local"
 				echo "#     - e.g. \`\"dist/*.cache\"\` will only work if you included 'dist' itself"
 				echo "#"
+				echo
 				echo "sync_include=$default_sync_include"
 				echo "sync_exclude=$default_sync_exclude"
-			) >> "$project_config"
+			) >> "$project_setup"
 		)
 	fi
 
-	if [[ ! -f $project_parameters ]]; then
-		touch "$project_parameters"
+	if [[ ! -f $project_param ]]; then
+		touch "$project_param"
 
 		(
 			source "$g_main_config"
 
 			(
-				echo "# rctl: project local parameters"
-				echo
-				echo
-				echo "# USAGE I"
+				echo "# rctl: project local param"
+				echo "#"
+				echo "# PUSH CONFIG"
 				echo "#     targets: list of targets"
 				echo "#     target_<target>: target connection config (\"<host>\" \"<user>\" \"<target_dir>"
 				echo "#"
-				echo "# ABOUT OTHER CONFIG V"
+				echo "# CUSTOM LOCAL VALUES"
 				echo "#     you can add here other parameters, that will be available in your hooks and commands."
 				echo "#"
-				echo "# ABOUT VERSION C"
+				echo "# ABOUT VERSION CONTROL"
 				echo "#     do not version-control this file."
 				echo "#"
 				echo "targets=($default_target)"
 				echo "target_$default_target=($default_target_host $default_target_user $default_target_dir)"
-			) >> "$project_parameters"
+			) >> "$project_param"
 
-			if [[ ! -f "$project_parameters.dist" ]]; then
-				cp "$project_parameters" "$project_parameters.dist"
+			if [[ ! -f "$project_param.dist" ]]; then
+				cp "$project_param" "$project_param.dist"
 			fi
 		)
 	fi
 
 	echo "rctl was initialized for this project"
-	echo "    use \`rctl .config\` to edit this project configuration"
-	echo "    use \`rctl .param\` to edit this project parameters"
+	echo "    use \`rctl .setup\` to edit this project general setup"
+	echo "    use \`rctl .param\` to edit this project local param"
 }
 
-project_edit_config() {
+project_edit_setup() {
 	if ! in_project; then
 		throw "$err_not_project"
 	fi
 
-	edit "$(find_project_root)/$g_project_config"
+	edit "$(find_project_root)/$g_project_setup"
 }
 
-project_edit_parameters() {
+project_edit_param() {
 	if ! in_project; then
 		throw "$err_not_project"
 	fi
 
-	edit "$(find_project_root)/$g_project_parameters"
+	edit "$(find_project_root)/$g_project_param"
 }
 
 project_edit_command() {
-	local command="$1"
-	local command_file
+	local cmd="$1"
+	local cmd_file
 
 	local project="$(find_project_root)"
 
@@ -530,11 +556,11 @@ project_edit_command() {
 		throw "$err_not_project"
 	fi
 
-	if [[ -z $command ]]; then
+	if [[ -z $cmd ]]; then
 		throw "requires the command name"
 	fi
 
-	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
+	if [[ ! $cmd =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
@@ -542,16 +568,18 @@ project_edit_command() {
 		throw "$err_not_project"
 	fi
 
-	command_file="$project/$g_project_commands_dir/$command.bash"
+	cmd_file="$project/$g_project_cmd_dir/$cmd.bash"
 
-	if [[ ! -f $command_file ]]; then
-		touch "$command_file"
+	if [[ ! -f $cmd_file ]]; then
+		touch "$cmd_file"
 
 		(
+			echo '#'
 			echo '# project custom command'
 			echo '#     - you can call all internal functions (see `which rctl`)'
 			echo '#     - you can access all internal variables'
-			echo '#     - you can access your project config'
+			echo '#     - you can access your project setup'
+			echo '#'
 			echo
 			echo 'command_run() {'
 			echo '	_print "" # command parameters (summary)'
@@ -587,73 +615,71 @@ project_edit_command() {
 			echo '_print() {'
 			echo "	echo -e \"$1\"\ | perl -pe 's/\t/    /g'"
 			echo '}'
-			echo '		) >> $command_file'
+			echo '		) >> $cmd_file'
 			echo '	fi'
 			echo
-			echo '	edit "$command_file"'
+			echo '	edit "$cmd_file"'
 			echo '}'
-		) >> $command_file
+		) >> $cmd_file
 	fi
 
-	edit "$command_file"
+	edit "$cmd_file"
 }
 
 project_edit_hook() {
-	#local when="$1"
-	#local command="$2"
 	local hook="$1"
-	local command="$(echo "$hook" | awk -F: '{ print $1 }')"
-	local when="$(echo "$hook" | awk -F: '{ print $2 }')"
+	local cmd="$(echo "$hook" | awk -F: '{ print $1 }')"
+	local at="$(echo "$hook" | awk -F: '{ print $2 }')"
 
 
 	local project="$(find_project_root)"
 	local hook_file
-	local command_file
+	local cmd_file
 
 	if ! in_project; then
 		throw "$err_not_project"
 	fi
 
-	if [[ $when != "before" && $when != "after" ]]; then
+	if [[ $at != "before" && $at != "after" ]]; then
 		throw "hook moment should be 'before' or 'after'"
 	fi
 
-	if [[ -z $command ]]; then
+	if [[ -z $cmd ]]; then
 		throw "requires the command name"
 	fi
 
-	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
+	if [[ ! $cmd =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
-	command_file="$project/$g_project_commands_dir/$command.bash"
-	if [[ $command != "push" && $command != "ssh" && ! -f $command_file ]]; then
+	cmd_file="$project/$g_project_cmd_dir/$cmd.bash"
+	if [[ $cmd != "push" && $cmd != "ssh" && ! -f $cmd_file ]]; then
 		throw "not a valid command"
 	fi
 
-	hook_file="$project/$g_project_hooks_dir/${command}.${when}.bash"
+	hook_file="$project/$g_project_hooks_dir/${cmd}.${at}.bash"
 
 	if [[ ! -f $hook_file ]]; then
 		touch "$hook_file"
 
 		(
-			echo "# project hook: $command:$when"
+			echo "# project hook: $cmd:$at"
 			echo "#"
 			echo "# you can call all rctl functions (see \`which rctl\` source code), such as:"
-			echo "#     * \`project_ssh <target> [<command> [<args...>]]\`"
-			echo "#     * \`project_run <custom_command>\`"
+			echo "#     * \`project_ssh <target> [<cmd> [<args...>]]\`"
+			echo "#     * \`project_run <custom_cmd>\`"
 			echo "#"
 			echo "# you can access and modify all variables, such as:"
 			echo "#     * \`project=\"\$project\"\` # current project root path"
-			if [[ $command == "push" ]]; then
+			if [[ $cmd == "push" ]]; then
 				echo "#     * \`sync_include=(\"\${sync_include[@]}\")\` # files to include"
 				echo "#     * \`sync_exclude=(\"\${sync_exclude[@]}\")\` # files to exclude"
 				echo "#     * \`rsync_opts=\"\$rsync_opts\"\` # rsync options (for example, to target -zz for older servers)"
 			fi
-			if [[ $command == "ssh" ]]; then
+			if [[ $cmd == "ssh" ]]; then
 				echo "#     * \`ssh_opts=(\"\${ssh_opts[@]}\")\` # options for ssh (default change dir, except if args not empty)"
 			fi
-			if [[ $command == "push" || $command == "ssh" ]]; then
+			if [[ $cmd == "push" || $cmd == "ssh" ]]; then
 				echo "#     * \`target=\"\$target\"\` # target"
 				echo "#     * \`target_host=\"\$target_host\"\` # target hostname"
 				echo "#     * \`target_user=\"\$target_user\"\` # target username"
@@ -689,7 +715,7 @@ project_push() {
 		local project_rctl="$project/$g_project_rctl"
 		cd "$project" # required for rsync
 
-		source "$(find_project_root)/$g_project_config"
+		source "$(find_project_root)/$g_project_setup"
 
 		local target_full="target_$target"
 		local target_host="$(eval echo \"\${$target_full[0]}\")"
@@ -699,11 +725,11 @@ project_push() {
 		local rsync=rsync
 		local rsync_opts="$g_rsync_opts"
 
-		run_global_hook_if_exists before push "$@" || return $ERR
-		run_project_hook_if_exists before push "$@" || return $ERR
+		run_global_hook_if_exists push "before" "$@" || return $ERR
+		run_project_hook_if_exists push "before" "$@" || return $ERR
 
 		if [[ -z $target_host || -z $target_user || -z $target_dir ]]; then
-			throw "no ssh parameters found for target '$target' in parameters.env"
+			throw "no ssh parameters found for target '$target' in param.env"
 		fi
 
 		local rsync_include=("${sync_include[@]}") # quote-enclosed, until the end
@@ -716,8 +742,8 @@ project_push() {
 		info "running push to $target"
 		$rsync $g_rsync_opts ${rsync_exclude[@]} ${rsync_include[@]} -e ssh "${target_user}@${target_host}:${target_dir}"
 
-		run_project_hook_if_exists after push "$@" || return $ERR
-		run_global_hook_if_exists after push "$@" || return $ERR
+		run_project_hook_if_exists push "after" "$@" || return $ERR
+		run_global_hook_if_exists push "after" "$@" || return $ERR
 	)
 }
 
@@ -743,17 +769,17 @@ project_ssh() {
 		local project_rctl="$project/$g_project_rctl"
 		cd "$project" # required for rsync
 
-		source "$(find_project_root)/$g_project_config"
+		source "$(find_project_root)/$g_project_setup"
 
 		local target_full="target_$target"
 		local target_host="$(eval echo \"\${$target_full[0]}\")"
 		local target_user="$(eval echo \"\${$target_full[1]}\")"
 
-		run_global_hook_if_exists before ssh "$@"
-		run_project_hook_if_exists before ssh "$@"
+		run_global_hook_if_exists ssh "before" "$@"
+		run_project_hook_if_exists ssh "before" "$@"
 
 		if [[ -z $target_host || -z $target_user ]]; then
-			throw "no ssh parameters found for target '$target' in parameters.env"
+			throw "no ssh parameters found for target '$target' in param.env"
 		fi
 
 		if [[ "${#args[@]}" -gt 0 ]]; then
@@ -761,51 +787,51 @@ project_ssh() {
 		fi
 		ssh "${target_user}@${target_host}" "${ssh_opts[@]}" "${args[@]}"
 
-		run_project_hook_if_exists after ssh "$@"
-		run_global_hook_if_exists after ssh "$@"
+		run_project_hook_if_exists ssh "after" "$@"
+		run_global_hook_if_exists ssh "after" "$@"
 	)
 }
 
 project_run() {
-	local command="$1"; shift
+	local cmd="$1"; shift
 	local project=""
-	local command_file
-	local is_project_command
+	local cmd_file
+	local is_project_cmd
 
-	if [[ ! $command =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
+	if [[ ! $cmd =~ ^[a-z_@][a-z0-9_@-]*$ ]]; then
 		throw "invalid command name"
 	fi
 
 	if ! in_project; then
-		command_file="$g_main_commands_dir/${command}.bash"
+		cmd_file="$g_main_cmd_dir/${cmd}.bash"
 
-		if [[ ! -f $command_file ]]; then
+		if [[ ! -f $cmd_file ]]; then
 			throw "invalid global command"
 		fi
 
-		run_global_hook_if_exists before "$command"
+		run_global_hook_if_exists "$cmd" "before"
 
-		source "$command_file"
-		info "running global command: $command"
+		source "$cmd_file"
+		info "running global command: $cmd"
 		command_run
-		command_exit=$?
+		cmd_exit=$?
 
-		run_global_hook_if_exists after "$command"
+		run_global_hook_if_exists "$cmd" "after"
 
-		exit $command_exit
+		exit $cmd_exit
 	fi
 
 	project="$(find_project_root)"
 	project_rctl="$project/$g_project_rctl"
 
-	command_file="$project/$g_project_commands_dir/${command}.bash"
-	is_project_command=true
+	cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+	is_project_cmd=true
 
-	if [[ ! -f $command_file ]]; then
-		command_file="$g_main_commands_dir/${command}.bash"
-		is_project_command=false
+	if [[ ! -f $cmd_file ]]; then
+		cmd_file="$g_main_cmd_dir/${cmd}.bash"
+		is_project_cmd=false
 
-		if [[ ! -f $command_file ]]; then
+		if [[ ! -f $cmd_file ]]; then
 			throw "invalid command"
 		fi
 	fi
@@ -813,26 +839,26 @@ project_run() {
 	(
 		cd "$project"
 
-		source "$(find_project_root)/$g_project_config"
+		source "$(find_project_root)/$g_project_setup"
 
-		run_global_hook_if_exists before "$command"
-		run_project_hook_if_exists before "$command"
+		run_global_hook_if_exists "$cmd" "before"
+		run_project_hook_if_exists "$cmd" "before"
 
-		source "$command_file"
+		source "$cmd_file"
 
-		if $is_project_command; then
-			info "running project command: $command"
+		if $is_project_cmd; then
+			info "running project command: $cmd"
 		else
-			info "running global command: $command"
+			info "running global command: $cmd"
 		fi
 
 		command_run "$@"
-		command_exit=$?
+		cmd_exit=$?
 
-		run_project_hook_if_exists after "$command"
-		run_global_hook_if_exists after "$command"
+		run_project_hook_if_exists "$cmd" "after"
+		run_global_hook_if_exists "$cmd" "after"
 
-		exit $command_exit
+		exit $cmd_exit
 	)
 }
 
@@ -843,13 +869,13 @@ project_run() {
 autocomplete() {
 	local arg="$1"; shift
 
-	local main_commands="$(list_commands "$g_main_commands_dir")"
+	local main_cmd="$(list_commands "$g_main_cmd_dir")"
 	local project="$(find_project_root "$PWD")"
 	local project_rctl="$project/$g_project_rctl"
-	local project_commands=""
+	local project_cmd=""
 
 	if in_project; then
-		project_commands="$(list_commands "$project/$g_project_commands_dir")"
+		project_cmd="$(list_commands "$project/$g_project_cmd_dir")"
 	fi
 
 	case $arg in
@@ -858,8 +884,8 @@ autocomplete() {
 				echo .help
 			fi
 
-			if [[ -n $main_commands ]]; then
-				for cmd in $main_commands; do
+			if [[ -n $main_cmd ]]; then
+				for cmd in $main_cmd; do
 					echo "$cmd"
 				done
 			fi
@@ -871,14 +897,14 @@ autocomplete() {
 			if in_project; then
 				echo ssh
 				echo push
-				echo .config
+				echo .setup
 				echo .param
 				echo .edit-hook
-				echo .edit-command
+				echo .edit-cmd
 				echo .help
 
-				if [[ -n $project_commands ]]; then
-					for cmd in $project_commands; do
+				if [[ -n $project_cmd ]]; then
+					for cmd in $project_cmd; do
 						echo "$cmd"
 					done
 				fi
@@ -902,17 +928,17 @@ autocomplete() {
 			;;
 
 		.help)
-			for cmd in $project_commands; do
+			for cmd in $project_cmd; do
 				echo "$cmd"
 			done
-			for cmd in $main_commands; do
+			for cmd in $main_cmd; do
 				echo "$cmd"
 			done
 			;;
 
-		.edit-command)
-			if [[ -n $project_commands ]]; then
-				for cmd in $project_commands; do
+		.edit-cmd)
+			if [[ -n $project_cmd ]]; then
+				for cmd in $project_cmd; do
 					echo "$cmd"
 				done
 			fi
@@ -920,7 +946,7 @@ autocomplete() {
 
 		.edit-hook)
 			if [[ -z $1 ]]; then
-				for cmd in push ssh ${project_commands[@]}; do
+				for cmd in push ssh ${project_cmd[@]}; do
 					echo "$cmd:before"
 					echo "$cmd:after"
 				done
@@ -928,12 +954,12 @@ autocomplete() {
 			;;
 
 		*)
-			if [[ -n $project_commands ]]; then
-				for command in $project_commands; do
-					if [[ $arg == $command ]]; then
-						command_file="$project/$g_project_commands_dir/${command}.bash"
-						source "$project/$g_project_config"
-						source "$command_file"
+			if [[ -n $project_cmd ]]; then
+				for cmd in $project_cmd; do
+					if [[ $arg == $cmd ]]; then
+						cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+						source "$project/$g_project_setup"
+						source "$cmd_file"
 						command_autocomplete "$@"
 					fi
 				done
@@ -975,24 +1001,21 @@ main() {
 			project_ssh "$target" "${args[@]}"
 			;;
 
-		.config)
-			project_edit_config
+		.setup)
+			project_edit_setup
 			;;
 
 		.param)
 			project_edit_parameters
 			;;
 
-		.edit-command)
-			local command="$1"
+		.edit-cmd)
+			local cmd="$1"
 
-			project_edit_command "$command"
+			project_edit_command "$cmd"
 			;;
 
 		.edit-hook)
-			#local when="$1"
-			#local command="$2"
-			#project_edit_hook "$when" "$command"
 			local hook="$1"
 			project_edit_hook "$hook"
 			;;
