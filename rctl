@@ -284,20 +284,19 @@ project_has_target() {
 
 usage() {
 	local cmd="$1"
-	local main_cmd="$(list_commands "$g_main_cmd_dir")"
-	local project="$(find_project_root)"
-	local project_cmd=""
+	local main_commands="$(list_commands "$g_main_cmd_dir")"
 
+	local project="$(find_project_root)"
 	local project_cmd_dir="$projects/$g_project_cmd_dir"
-	local project_cmd_dir="$projects/$g_project_cmd_dir"
+	local project_commands=""
 
 	if in_project; then
-		project_cmd="$(list_commands "$project_cmd_dir")"
+		project_commands="$(list_commands "$project_cmd_dir")"
 	fi
 
 	if [[ -n $cmd ]]; then
 		if in_project; then
-			for test_cmd in $project_cmd; do
+			for test_cmd in $project_commands; do
 				if [[ $test_cmd == $cmd ]]; then
 					project="$(find_project_root)"
 					project_rctl="$project/$g_project_rctl"
@@ -311,7 +310,7 @@ usage() {
 			done
 		fi
 
-		for test_cmd in $main_cmd; do
+		for test_cmd in $main_commands; do
 			if [[ $test_cmd == $cmd ]]; then
 				cmd_file="$g_main_cmd_dir/${cmd}.bash"
 				echo -n "rctl ${cmd} "
@@ -357,11 +356,11 @@ usage() {
 	echo "    .help [<custom_cmd>]"
 	echo "        print this help (or help about the specified custom command)"
 
-	if [[ -n $project_cmd ]]; then
+	if [[ -n $project_commands ]]; then
 		echo
 		echo "project-specific commands:"
 		echo
-		for cmd in $project_cmd; do
+		for cmd in $project_commands; do
 			project="$(find_project_root)"
 			project_rctl="$project/$g_project_rctl"
 			cmd_file="$project_cmd_dir/${cmd}.bash"
@@ -372,11 +371,11 @@ usage() {
 		done
 	fi
 
-	if [[ -n $main_cmd ]]; then
+	if [[ -n $main_commands ]]; then
 		echo
 		echo "global custom commands:"
 		echo
-		for cmd in $main_cmd; do
+		for cmd in $main_commands; do
 			cmd_file="$g_main_cmd_dir/${cmd}.bash"
 			source "$cmd_file"
 			echo "    $cmd $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
@@ -881,14 +880,14 @@ project_run() {
 autocomplete() {
 	local arg="$1"; shift
 
-	local main_cmd="$(list_commands "$g_main_cmd_dir")"
+	local main_commands="$(list_commands "$g_main_cmd_dir")"
 	local project="$(find_project_root "$PWD")"
 	local project_rctl="$project/$g_project_rctl"
-	local project_cmd=""
+	local project_commands=""
 	local project_cmd_dir="$projects/$g_project_cmd_dir"
 
 	if in_project; then
-		project_cmd="$(list_commands "$project_cmd_dir")"
+		project_commands="$(list_commands "$project_cmd_dir")"
 	fi
 
 	case $arg in
@@ -897,8 +896,8 @@ autocomplete() {
 				echo .help
 			fi
 
-			if [[ -n $main_cmd ]]; then
-				for cmd in $main_cmd; do
+			if [[ -n $main_commands ]]; then
+				for cmd in $main_commands; do
 					echo "$cmd"
 				done
 			fi
@@ -916,8 +915,8 @@ autocomplete() {
 				echo .edit-cmd
 				echo .help
 
-				if [[ -n $project_cmd ]]; then
-					for cmd in $project_cmd; do
+				if [[ -n $project_commands ]]; then
+					for cmd in $project_commands; do
 						echo "$cmd"
 					done
 				fi
@@ -941,17 +940,17 @@ autocomplete() {
 			;;
 
 		.help)
-			for cmd in $project_cmd; do
+			for cmd in $project_commands; do
 				echo "$cmd"
 			done
-			for cmd in $main_cmd; do
+			for cmd in $main_commands; do
 				echo "$cmd"
 			done
 			;;
 
 		.edit-cmd)
-			if [[ -n $project_cmd ]]; then
-				for cmd in $project_cmd; do
+			if [[ -n $project_commands ]]; then
+				for cmd in $project_commands; do
 					echo "$cmd"
 				done
 			fi
@@ -967,8 +966,8 @@ autocomplete() {
 			;;
 
 		*)
-			if [[ -n $project_cmd ]]; then
-				for cmd in $project_cmd; do
+			if [[ -n $project_commands ]]; then
+				for cmd in $project_commands; do
 					if [[ $arg == $cmd ]]; then
 						cmd_file="$project_cmd_dir/${cmd}.bash"
 						source "$project/$g_project_setup"
