@@ -434,9 +434,9 @@ upgrade_project() {
 	fi
 
 	if [[ -f "$project/$g_project_rctl/.gitignore" ]]; then
-		perl -pe 's:^/(\.rctl/)?parameters\.env$:/param.env:g' -i "$project/$g_project_rctl/.gitignore"
+		perl -pe 's:^/(\.rctl/)?(commands|cmd)/local/\*(\.bash)?$:/cmd/local/*:g' -i "$project/$g_project_rctl/.gitignore"
 		perl -pe 's:^/(\.rctl/)?hooks/local/\*(\.bash)?$:/hooks/local/*:g' -i "$project/$g_project_rctl/.gitignore"
-		perl -pe 's:^/(\.rctl/)?commands/local/\*(\.bash)?$:/cmd/local/*:g' -i "$project/$g_project_rctl/.gitignore"
+		perl -pe 's:^/(\.rctl/)?(parameters|param)\.env$:/param.env:g' -i "$project/$g_project_rctl/.gitignore"
 	fi
 
 	if [[ -f "$project/$g_project_cmd_dir/local/.gitignore" ]]; then
