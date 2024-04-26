@@ -7,6 +7,12 @@ set -o pipefail
 # set -o pipefail -> prevents errors in a pipeline from being masked
 
 
+# rctl version
+#-------------------------------------------------------------------------------
+
+g_version_major=2
+
+
 # backup values
 #-------------------------------------------------------------------------------
 
@@ -29,6 +35,7 @@ g_rctl="$(basename "$0")"
 g_main_rctl="$XDG_CONFIG_HOME/rctl"
 g_main_cmd_dir="$g_main_rctl/cmd" # global commands
 g_main_hooks_dir="$g_main_rctl/hooks" # global hooks
+g_main_version="$g_main_rctl/.version" # global version
 g_main_config="$g_main_rctl/rctl.env" # global config
 
 g_project_rctl=".rctl"
@@ -40,14 +47,11 @@ g_project_rctl_gitignore=( \
 )
 g_project_cmd_dir="$g_project_rctl/cmd"
 g_project_hooks_dir="$g_project_rctl/hooks"
+g_project_version="$g_project_rctl/.version"
 g_project_param="$g_project_rctl/param.env"
 g_project_setup="$g_project_rctl/setup.env"
 
-g_project_cmd_dir_OLD="$g_project_rctl/commands"
-g_project_param_OLD="$g_project_rctl/parameters.env"
-g_project_setup_OLD="$g_project_rctl/config.env"
-
-g_project_root_hints=("$g_project_setup" "$g_project_setup_OLD")
+g_project_root_hints=("$g_project_setup")
 g_initializable_root_hints=(".git")
 
 g_rsync_opts="--recursive --executability --copy-links --delete -zz"
@@ -74,7 +78,6 @@ throw() {
 
 	exit $ERR
 }
-
 
 task_head() {
 	local task_name="$(echo "$1" | perl -pe 's/ +/_/g')"
@@ -262,6 +265,7 @@ project_list_targets() {
 	(
 		local project="$(find_project_root)"
 		local project_rctl="$project/$g_project_rctl"
+
 		cd "$project" # required for rsync
 		source "$(find_project_root)/$g_project_setup"
 
@@ -290,8 +294,11 @@ usage() {
 	local project="$(find_project_root)"
 	local project_cmd=""
 
+	local project_cmd_dir="$projects/$g_project_cmd_dir"
+	local project_cmd_dir="$projects/$g_project_cmd_dir"
+
 	if in_project; then
-		project_cmd="$(list_commands "$project/$g_project_cmd_dir")"
+		project_cmd="$(list_commands "$project_cmd_dir")"
 	fi
 
 	if [[ -n $cmd ]]; then
@@ -300,7 +307,7 @@ usage() {
 				if [[ $test_cmd == $cmd ]]; then
 					project="$(find_project_root)"
 					project_rctl="$project/$g_project_rctl"
-					cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+					cmd_file="$project_cmd_dir/${cmd}.bash"
 					echo -n "rctl ${cmd} "
 					source "$(find_project_root)/$g_project_setup"
 					source "$cmd_file"
@@ -363,7 +370,7 @@ usage() {
 		for cmd in $project_cmd; do
 			project="$(find_project_root)"
 			project_rctl="$project/$g_project_rctl"
-			cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+			cmd_file="$project_cmd_dir/${cmd}.bash"
 			source "$(find_project_root)/$g_project_setup"
 			source "$cmd_file"
 			echo "    $cmd $(command_usage "$@" | perl -pe 's/^/    /g' | sed '1s/^    //')"
@@ -386,12 +393,31 @@ usage() {
 	#echo "edit your global setup in: $g_main_rctl"
 }
 
+check_version() {
+	if [[ -d $g_main_rctl ]]; then
+		if [[ ! -f $g_main_version || "$(cat "$g_main_version")" -ne "$g_version_major" ]]; then
+			throw "you have an old version of rctl installed in your home.\nplease manually upgrade \`$g_main_rctl\` to version $g_version_major"
+		fi
+	fi
+
+	if in_project; then
+		local project="$(find_project_root)"
+		local project_version="$project/$g_project_version"
+
+		if [[ ! -f "$project_version" || "$(cat "$project_version")" -ne "$g_version_major" ]]; then
+			throw "you have an old version of rctl installed in this project.\nplease manually upgrade $project to version $g_version_major"
+		fi
+	fi
+}
+
 rctl_setup() {
 	if [[ ! -d $g_main_rctl ]]; then
 		mkdir -p "$g_main_rctl"
-		touch "$g_main_config"
 		mkdir "$g_main_cmd_dir"
 		mkdir "$g_main_hooks_dir"
+
+		touch "$g_main_config"
+		echo "$g_version_major" > "$g_main_version"
 
 		(
 			echo "editor=\"$EDITOR\""
@@ -433,20 +459,9 @@ project_init() {
 
 	local project_cmd_dir="$project/$g_project_cmd_dir"
 	local project_hooks_dir="$project/$g_project_hooks_dir"
+	local project_version="$project/$g_project_version"
 	local project_param="$project/$g_project_param"
 	local project_setup="$project/$g_project_setup"
-
-	if [[ ! -d $project_cmd_dir && -d "$project/$g_project_cmd_dir_OLD" ]]; then
-		project_cmd_dir="$project/$g_project_cmd_dir_OLD"
-	fi
-
-	if [[ ! -f $project_param && -f "$project/$g_project_param_OLD" ]]; then
-		project_param="$project/$g_project_param_OLD"
-	fi
-
-	if [[ ! -f $project_setup && -f "$project/$g_project_setup_OLD" ]]; then
-		project_setup="$project/$g_project_setup_OLD"
-	fi
 
 	[[ -d $project_rctl ]] || mkdir -p "$project_rctl"
 
@@ -460,6 +475,7 @@ project_init() {
 	[[ -d $project_hooks_dir ]] || mkdir "$project_hooks_dir"
 	[[ -d "$project_cmd_dir/local" ]] || mkdir "$project_cmd_dir/local"
 	[[ -d "$project_hooks_dir/local" ]] || mkdir "$project_hooks_dir/local"
+	[[ -f "$project_version" ]] || echo "$g_version_major" > "$project_version"
 
 	if [[ ! -f $project_setup ]]; then
 		touch "$project_setup"
@@ -551,6 +567,7 @@ project_edit_command() {
 	local cmd_file
 
 	local project="$(find_project_root)"
+	local project_cmd_dir="$projects/$g_project_cmd_dir"
 
 	if ! in_project; then
 		throw "$err_not_project"
@@ -568,7 +585,7 @@ project_edit_command() {
 		throw "$err_not_project"
 	fi
 
-	cmd_file="$project/$g_project_cmd_dir/$cmd.bash"
+	cmd_file="$project_cmd_dir/$cmd.bash"
 
 	if [[ ! -f $cmd_file ]]; then
 		touch "$cmd_file"
@@ -631,8 +648,9 @@ project_edit_hook() {
 	local cmd="$(echo "$hook" | awk -F: '{ print $1 }')"
 	local at="$(echo "$hook" | awk -F: '{ print $2 }')"
 
-
 	local project="$(find_project_root)"
+	local project_cmd_dir="$projects/$g_project_cmd_dir"
+
 	local hook_file
 	local cmd_file
 
@@ -652,7 +670,7 @@ project_edit_hook() {
 		throw "invalid command name"
 	fi
 
-	cmd_file="$project/$g_project_cmd_dir/$cmd.bash"
+	cmd_file="$project_cmd_dir/$cmd.bash"
 	if [[ $cmd != "push" && $cmd != "ssh" && ! -f $cmd_file ]]; then
 		throw "not a valid command"
 	fi
@@ -823,8 +841,8 @@ project_run() {
 
 	project="$(find_project_root)"
 	project_rctl="$project/$g_project_rctl"
-
-	cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+	project_cmd_dir="$projects/$g_project_cmd_dir"
+	cmd_file="$project_cmd_dir/${cmd}.bash"
 	is_project_cmd=true
 
 	if [[ ! -f $cmd_file ]]; then
@@ -873,9 +891,10 @@ autocomplete() {
 	local project="$(find_project_root "$PWD")"
 	local project_rctl="$project/$g_project_rctl"
 	local project_cmd=""
+	local project_cmd_dir="$projects/$g_project_cmd_dir"
 
 	if in_project; then
-		project_cmd="$(list_commands "$project/$g_project_cmd_dir")"
+		project_cmd="$(list_commands "$project_cmd_dir")"
 	fi
 
 	case $arg in
@@ -957,7 +976,7 @@ autocomplete() {
 			if [[ -n $project_cmd ]]; then
 				for cmd in $project_cmd; do
 					if [[ $arg == $cmd ]]; then
-						cmd_file="$project/$g_project_cmd_dir/${cmd}.bash"
+						cmd_file="$project_cmd_dir/${cmd}.bash"
 						source "$project/$g_project_setup"
 						source "$cmd_file"
 						command_autocomplete "$@"
@@ -973,9 +992,12 @@ autocomplete() {
 #-------------------------------------------------------------------------------
 
 main() {
-	rctl_setup
-
 	local action="$1"; shift
+
+	if [[ $action != "---" ]]; then
+		check_version
+		rctl_setup
+	fi
 
 	if ! in_project && [[ $action == ".help" ]]; then
 		usage
