@@ -1069,7 +1069,7 @@ main() {
 			;;
 
 		.param)
-			project_edit_parameters
+			project_edit_param
 			;;
 
 		.edit-cmd)
