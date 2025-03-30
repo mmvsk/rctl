@@ -643,6 +643,7 @@ project_edit_command() {
 			echo '}'
 			echo
 			echo 'command_usage() {'
+			echo '	echo -n'
 			echo '	# parameters'
 			echo '	#echo "{aaa|bbb}"'
 			echo '	# details (use $_ as 1-level padding)'
@@ -651,6 +652,7 @@ project_edit_command() {
 			echo '}'
 			echo
 			echo 'command_autocomplete() {'
+			echo '	echo -n'
 			echo '	#case "$1" in'
 			echo '		#"")'
 			echo '			#echo "aaa"'
