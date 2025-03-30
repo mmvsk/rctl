@@ -671,11 +671,6 @@ project_edit_command() {
 			echo '_print() {'
 			echo "	echo -e \"$1\"\ | perl -pe 's/\t/    /g'"
 			echo '}'
-			echo '		) >> $cmd_file'
-			echo '	fi'
-			echo
-			echo '	edit "$cmd_file"'
-			echo '}'
 		) >> $cmd_file
 	fi
 
