@@ -50,7 +50,7 @@ g_project_root_hints=("$g_project_setup" "$g_project_old_config")
 g_initializable_root_hints=(".git")
 
 #g_rsync_opts="--recursive --executability --links --safe-links --delete --compress"
-g_rsync_opts="--recursive --links --safe-links --executability --compress --delete"
+g_rsync_opts="--recursive --links --safe-links --executability --compress --delete --info=progress2"
 
 
 # library
