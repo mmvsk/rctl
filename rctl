@@ -49,7 +49,7 @@ g_project_old_config="$g_project_rctl/config.env"
 g_project_root_hints=("$g_project_setup" "$g_project_old_config")
 g_initializable_root_hints=(".git")
 
-g_rsync_opts="--recursive --executability --copy-links --delete -zz"
+g_rsync_opts="--recursive --executability --links --safe-links --delete -z"
 
 
 # library
