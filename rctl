@@ -815,9 +815,12 @@ project_push() {
 
 		info "running push to $target"
 		$rsync $rsync_opts "${rsync_exclude[@]}" -e ssh ${rsync_include[@]} "${target_user}@${target_host}:${target_dir}"
+		local rsync_exit=$?
 
 		run_project_hook_if_exists push "after" "$@" || return $?
 		run_global_hook_if_exists push "after" "$@" || return $?
+
+		return $rsync_exit
 	)
 }
 
@@ -860,9 +863,12 @@ project_ssh() {
 			info "running ssh on $target"
 		fi
 		ssh "${ssh_opts[@]}" "${target_user}@${target_host}" "${args[@]}"
+		local ssh_exit=$?
 
 		run_project_hook_if_exists ssh "after" "$@" || return $?
 		run_global_hook_if_exists ssh "after" "$@" || return $?
+
+		return $ssh_exit
 	)
 }
 
